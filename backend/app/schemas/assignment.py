@@ -36,6 +36,16 @@ class AssignmentCreateRequest(BaseModel):
         return value
 
 
+class AssignmentFileRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    original_filename: str
+    content_type: Optional[str]
+    file_size: int
+    created_at: datetime
+
+
 class AssignmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,6 +58,7 @@ class AssignmentRead(BaseModel):
     late_penalty_periods: list[dict[str, int]]
     gitea_repo_name: Optional[str]
     created_at: datetime
+    files: list[AssignmentFileRead] = []
 
 
 class GiteaCommitAuthorRead(BaseModel):

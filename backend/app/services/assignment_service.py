@@ -23,7 +23,10 @@ async def create_assignment(
     start_date: datetime,
     deadline: datetime,
     late_penalty_periods: list[dict[str, int]],
+    files: list[dict] | None = None,
 ) -> Assignment:
+    from app.models.assignment_file import AssignmentFile
+    
     course_q = await session.execute(select(Course).where(Course.id == course_id))
     course = course_q.scalar_one_or_none()
     if not course or course.teacher_id != teacher_id:
@@ -54,6 +57,18 @@ async def create_assignment(
 
     session.add(assignment)
     await session.flush()
+
+    # Сохраняем файлы задания.
+    if files:
+        for file_info in files:
+            file_record = AssignmentFile(
+                assignment_id=assignment_id,
+                original_filename=file_info["original_filename"],
+                storage_path=file_info["storage_path"],
+                content_type=file_info.get("content_type"),
+                file_size=file_info["file_size"],
+            )
+            session.add(file_record)
 
     # Для нового задания создаём персональный репозиторий каждому текущему студенту курса.
     enrolled_q = await session.execute(
@@ -96,7 +111,9 @@ async def list_assignments_for_student(
     *,
     student_id: UUID,
     course_id: UUID,
+    student_group_name: str | None = None,
 ) -> list[Assignment]:
+    # Check if student is enrolled
     enrollment_q = await session.execute(
         select(CourseEnrollment).where(
             CourseEnrollment.course_id == course_id,
@@ -104,8 +121,52 @@ async def list_assignments_for_student(
         )
     )
     enrollment = enrollment_q.scalar_one_or_none()
+    
     if not enrollment:
-        raise PermissionError("Not enrolled")
+        # Auto-enroll if student has access via target_groups
+        course_q = await session.execute(
+            select(Course).where(Course.id == course_id)
+        )
+        course = course_q.scalar_one_or_none()
+        if not course:
+            raise PermissionError("Course not found")
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Auto-enroll check: course.target_groups={course.target_groups}, student_group={student_group_name}")
+        
+        # Check if course allows access (no target_groups or student's group in list)
+        # Handle SQLAlchemy ARRAY properly - convert to Python list if needed
+        target_groups = course.target_groups
+        if target_groups is None or len(target_groups) == 0:
+            can_access = True
+        else:
+            can_access = student_group_name is not None and student_group_name in list(target_groups)
+        
+        logger.info(f"can_access={can_access}")
+        
+        if not can_access:
+            raise PermissionError("Not enrolled and no access")
+        
+        # Auto-enroll student
+        enrollment = CourseEnrollment(course_id=course_id, student_id=student_id)
+        session.add(enrollment)
+        
+        # Create repos for all existing assignments
+        assignments_q = await session.execute(
+            select(Assignment.id).where(Assignment.course_id == course_id)
+        )
+        assignment_ids = list(assignments_q.scalars().all())
+        for assignment_id in assignment_ids:
+            await ensure_student_repository(
+                session,
+                assignment_id=assignment_id,
+                student_id=student_id,
+            )
+        
+        await session.commit()
+        await session.refresh(enrollment)
 
     result = await session.execute(
         select(Assignment)
@@ -113,4 +174,51 @@ async def list_assignments_for_student(
         .order_by(Assignment.deadline.asc())
     )
     return list(result.scalars().all())
+
+
+async def delete_assignment(
+    session: AsyncSession,
+    *,
+    teacher_id: UUID,
+    course_id: UUID,
+    assignment_id: UUID,
+) -> None:
+    """Delete assignment if teacher owns the course."""
+    from app.models.course import Course
+    from app.models.student_repository import StudentRepository
+    from app.models.submission import Submission
+    from sqlalchemy import delete
+    
+    # Check course exists and teacher owns it
+    course_q = await session.execute(
+        select(Course).where(Course.id == course_id, Course.teacher_id == teacher_id)
+    )
+    course = course_q.scalar_one_or_none()
+    if not course:
+        raise PermissionError("Course not found or teacher access only")
+    
+    # Check assignment exists in this course
+    assignment_q = await session.execute(
+        select(Assignment).where(
+            Assignment.id == assignment_id,
+            Assignment.course_id == course_id,
+        )
+    )
+    assignment = assignment_q.scalar_one_or_none()
+    if not assignment:
+        raise ValueError("Assignment not found")
+    
+    # Delete related student repositories first
+    await session.execute(
+        delete(StudentRepository).where(StudentRepository.assignment_id == assignment_id)
+    )
+    
+    # Delete related submissions
+    await session.execute(
+        delete(Submission).where(Submission.assignment_id == assignment_id)
+    )
+    
+    # Delete the assignment
+    await session.execute(delete(Assignment).where(Assignment.id == assignment_id))
+    await session.commit()
 

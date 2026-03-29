@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class CourseCreateRequest(BaseModel):
@@ -31,6 +31,12 @@ class CourseRead(BaseModel):
     target_groups: Optional[List[str]] = None
     teacher_id: UUID
     created_at: datetime
+
+    @computed_field
+    @property
+    def enrolled_count(self) -> int:
+        # Get from instance attribute if set by service layer
+        return getattr(self, '_enrolled_count', 0)
 
 
 class CourseEnrollmentRead(BaseModel):

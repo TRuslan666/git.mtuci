@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -30,5 +30,13 @@ class Assignment(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships - use string reference to avoid circular import
+    files: Mapped[list["AssignmentFile"]] = relationship(
+        "AssignmentFile",
+        back_populates="assignment",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 

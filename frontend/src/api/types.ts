@@ -36,6 +36,7 @@ export interface Course {
   target_groups: string[] | null;
   teacher_id: string;
   created_at: string;
+  enrolled_count?: number;
 }
 
 export interface Assignment {

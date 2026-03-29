@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { getMe } from "../api/authApi";
-import { createCourse, deleteCourse, getCourses } from "../api/coursesApi";
+import { createCourse, deleteCourse, getCourses, getGroups } from "../api/coursesApi";
 import type { Course, UserRead } from "../api/types";
 
 export default function CoursesPage() {
@@ -18,6 +18,10 @@ export default function CoursesPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
+  
+  // Groups selection
+  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,7 +30,11 @@ export default function CoursesPage() {
       setLoading(true);
       setError(null);
       try {
-        const [meResult, coursesResult] = await Promise.allSettled([getMe(), getCourses()]);
+        const [meResult, coursesResult, groupsResult] = await Promise.allSettled([
+          getMe(), 
+          getCourses(),
+          getGroups()
+        ]);
         if (cancelled) return;
 
         if (meResult.status === "fulfilled") {
@@ -43,6 +51,10 @@ export default function CoursesPage() {
           setError(
             coursesResult.reason instanceof Error ? coursesResult.reason.message : "Failed",
           );
+        }
+        
+        if (groupsResult.status === "fulfilled") {
+          setAvailableGroups(groupsResult.value);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed");
@@ -72,11 +84,13 @@ export default function CoursesPage() {
         title: createTitle.trim(),
         description: createDescription.trim(),
         grade_max: createGradeMax,
+        target_groups: selectedGroups.length > 0 ? selectedGroups : undefined,
       });
       setCourses((prev) => [created, ...prev]);
       setCreateTitle("");
       setCreateDescription("");
       setCreateGradeMax(10);
+      setSelectedGroups([]);
       setShowCreateForm(false);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create course");
@@ -176,6 +190,44 @@ export default function CoursesPage() {
               <span>45</span>
               <span>50</span>
             </div>
+            
+            {/* Groups selection */}
+            {availableGroups.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-2 text-sm font-medium text-gray-700">Доступные группы:</div>
+                <div className="flex flex-wrap gap-2">
+                  {availableGroups.map((group) => (
+                    <label
+                      key={group}
+                      className={`cursor-pointer rounded-lg border px-3 py-1.5 text-sm transition ${
+                        selectedGroups.includes(group)
+                          ? "border-purple-500 bg-purple-50 text-purple-700"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-purple-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={selectedGroups.includes(group)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedGroups((prev) => [...prev, group]);
+                          } else {
+                            setSelectedGroups((prev) => prev.filter((g) => g !== group));
+                          }
+                        }}
+                      />
+                      {group}
+                    </label>
+                  ))}
+                </div>
+                {selectedGroups.length === 0 && (
+                  <div className="mt-1 text-xs text-gray-400">
+                    Если не выбрано ни одной группы, курс будет доступен всем
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {createError ? (
             <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -216,7 +268,7 @@ export default function CoursesPage() {
                   </div>
                 ) : null}
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div className="rounded-md bg-gray-50 px-2 py-1">Студентов: —</div>
+                  <div className="rounded-md bg-gray-50 px-2 py-1">Студентов: {c.enrolled_count ?? 0}</div>
                   <div className="rounded-md bg-purple-50 px-2 py-1 text-purple-700">
                     Макс. оценка: {c.grade_max}
                   </div>

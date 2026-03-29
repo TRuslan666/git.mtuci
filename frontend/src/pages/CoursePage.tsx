@@ -2,12 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getMe } from "../api/authApi";
-import { createAssignment, getAssignments, getCourses } from "../api/coursesApi";
+import { createAssignment, getAssignments, getCourses, deleteAssignment } from "../api/coursesApi";
 import type { Assignment, UserRead } from "../api/types";
 
 export default function CoursePage() {
   const { courseId } = useParams();
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const today = useMemo(() => {
+    // Get Moscow date (UTC+3)
+    const moscowDate = new Date().toLocaleDateString('ru-RU', {
+      timeZone: 'Europe/Moscow',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    // Convert from DD.MM.YYYY to YYYY-MM-DD
+    const [day, month, year] = moscowDate.split('.');
+    return `${year}-${month}-${day}`;
+  }, []);
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [courseTitle, setCourseTitle] = useState<string | null>(null);
@@ -22,6 +33,7 @@ export default function CoursePage() {
   const [latePenaltyPeriods, setLatePenaltyPeriods] = useState<Array<{ weeks: number; max_grade: number }>>([
     { weeks: 1, max_grade: 4 },
   ]);
+  const [createFiles, setCreateFiles] = useState<File[]>([]);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [penaltyValidationError, setPenaltyValidationError] = useState<string | null>(null);
@@ -29,6 +41,7 @@ export default function CoursePage() {
   useEffect(() => {
     if (!courseId) return;
     let cancelled = false;
+    const courseIdStr = courseId; // capture for TypeScript
 
     async function load() {
       setLoading(true);
@@ -36,7 +49,7 @@ export default function CoursePage() {
       try {
         const [meResult, as, cs] = await Promise.allSettled([
           getMe(),
-          getAssignments(courseId),
+          getAssignments(courseIdStr),
           getCourses(),
         ]);
 
@@ -45,7 +58,7 @@ export default function CoursePage() {
         }
         if (as.status === "fulfilled" && !cancelled) setAssignments(as.value);
         if (cs.status === "fulfilled" && !cancelled) {
-          const found = cs.value.find((c) => c.id === courseId);
+          const found = cs.value.find((c) => c.id === courseIdStr);
           if (found) setCourseTitle(found.title);
         }
       } catch (err) {
@@ -97,9 +110,32 @@ export default function CoursePage() {
     setCreateError(null);
     setPenaltyValidationError(null);
     try {
+      // Validate deadline is not in the past
+      if (createDeadline) {
+        const deadlineDate = new Date(createDeadline);
+        const now = new Date();
+        if (deadlineDate < now) {
+          setCreateError("Дедлайн не может быть в прошлом");
+          setCreateLoading(false);
+          return;
+        }
+      }
+      
+      // Validate start date is not after deadline
+      if (createStartDate && createDeadline) {
+        const start = new Date(createStartDate);
+        const deadline = new Date(createDeadline);
+        if (start > deadline) {
+          setCreateError("Дата начала не может быть позже дедлайна");
+          setCreateLoading(false);
+          return;
+        }
+      }
+
       const validationError = validatePenaltyPeriods(latePenaltyPeriods);
       if (validationError) {
         setPenaltyValidationError(validationError);
+        setCreateLoading(false);
         return;
       }
       const deadlineIso = new Date(createDeadline).toISOString();
@@ -110,6 +146,7 @@ export default function CoursePage() {
         start_date: startDateIso,
         deadline: deadlineIso,
         late_penalty_periods: latePenaltyPeriods,
+        files: createFiles,
       });
       setAssignments((prev) => [...prev, created].sort((a, b) => a.deadline.localeCompare(b.deadline)));
       setCreateTitle("");
@@ -117,11 +154,24 @@ export default function CoursePage() {
       setCreateStartDate("");
       setCreateDeadline("");
       setLatePenaltyPeriods([{ weeks: 1, max_grade: 4 }]);
+      setCreateFiles([]);
       setShowCreateForm(false);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create assignment");
     } finally {
       setCreateLoading(false);
+    }
+  }
+
+  async function handleDeleteAssignment(assignmentId: string) {
+    if (!courseId) return;
+    if (!confirm("Удалить это задание? Это действие нельзя отменить.")) return;
+    
+    try {
+      await deleteAssignment(courseId, assignmentId);
+      setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete assignment");
     }
   }
 
@@ -171,21 +221,70 @@ export default function CoursePage() {
               className="min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
             />
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Дата начала</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Файлы задания</label>
               <input
-                type="date"
-                value={createStartDate}
-                onChange={(e) => setCreateStartDate(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                required
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setCreateFiles(files);
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-purple-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-purple-700 hover:file:bg-purple-200"
               />
+              {createFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {createFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1 text-sm text-gray-700">
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCreateFiles((prev) => prev.filter((_, i) => i !== idx))}
+                        className="ml-2 text-red-600 hover:text-red-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Дата начала</label>
+              <div className="relative flex items-center">
+                <input
+                  type="date"
+                  value={createStartDate}
+                  onChange={(e) => setCreateStartDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-24 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setCreateStartDate(today)}
+                  className="absolute right-2 rounded-md bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-200 transition"
+                >
+                  Сегодня
+                </button>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Дедлайн</label>
               <input
                 type="datetime-local"
                 value={createDeadline}
-                onChange={(e) => setCreateDeadline(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    const selected = new Date(value);
+                    const now = new Date();
+                    if (selected < now) {
+                      setCreateError("Дедлайн не может быть в прошлом");
+                      return;
+                    }
+                  }
+                  setCreateError(null);
+                  setCreateDeadline(value);
+                }}
                 min={`${today}T00:00`}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                 required
@@ -215,13 +314,16 @@ export default function CoursePage() {
                 {latePenaltyPeriods.map((period, idx) => (
                   <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       min={1}
                       value={period.weeks}
                       onChange={(e) => {
-                        const nextWeeks = Number(e.target.value);
+                        const val = e.target.value.replace(/^0+(?=[1-9])/, "");
+                        const nextWeeks = val === "" ? 0 : parseInt(val, 10);
                         const prevWeeks = idx > 0 ? latePenaltyPeriods[idx - 1].weeks : null;
-                        if (prevWeeks !== null && nextWeeks <= prevWeeks) {
+                        if (prevWeeks !== null && nextWeeks <= prevWeeks && nextWeeks !== 0) {
                           setPenaltyValidationError(
                             "Нельзя добавить период с неделями меньше или равными предыдущему периоду",
                           );
@@ -237,11 +339,14 @@ export default function CoursePage() {
                       required
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       min={0}
                       value={period.max_grade}
                       onChange={(e) => {
-                        const nextMax = Number(e.target.value);
+                        const val = e.target.value.replace(/^0+(?=[0-9])/, "");
+                        const nextMax = val === "" ? 0 : parseInt(val, 10);
                         const prevMax = idx > 0 ? latePenaltyPeriods[idx - 1].max_grade : null;
                         if (prevMax !== null && nextMax > prevMax) {
                           setPenaltyValidationError(
@@ -287,15 +392,22 @@ export default function CoursePage() {
             </div>
           </div>
           {createError ? (
-            <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {createError}
             </div>
           ) : null}
-          <div className="mt-3">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Отмена
+            </button>
             <button
               type="submit"
-              disabled={createLoading}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700 disabled:opacity-60"
+              disabled={createLoading || !!penaltyValidationError}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700 disabled:opacity-50"
             >
               {createLoading ? "Создание..." : "Создать"}
             </button>
@@ -314,35 +426,45 @@ export default function CoursePage() {
         <div className="mb-3 text-lg font-semibold text-gray-900">Задания</div>
         <div className="space-y-3">
         {assignments.map((a) => (
-          <Link
-            key={a.id}
-            to={`/courses/${courseId}/assignments/${a.id}`}
-            className="block rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:border-purple-200 hover:bg-white"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-base font-semibold text-gray-900">
-                  <span>📘</span>
-                  <span className="truncate">{a.title}</span>
-                </div>
-                {a.description ? (
-                  <div className="mt-1 text-sm text-gray-600 line-clamp-3">
-                    {a.description}
+          <div key={a.id} className="group relative">
+            <Link
+              to={`/courses/${courseId}/assignments/${a.id}`}
+              className="block rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:border-purple-200 hover:bg-white"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                    <span>📘</span>
+                    <span className="truncate">{a.title}</span>
                   </div>
-                ) : null}
-              </div>
-              <div className="text-right text-sm text-gray-700">
-                <div>
-                  Дедлайн: <span className="font-medium">{new Date(a.deadline).toLocaleString()}</span>
+                  {a.description ? (
+                    <div className="mt-1 text-sm text-gray-600 line-clamp-3">
+                      {a.description}
+                    </div>
+                  ) : null}
                 </div>
-                <div className="mt-1">
-                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-                    Активно
-                  </span>
+                <div className="text-right text-sm text-gray-700">
+                  <div>
+                    Дедлайн: <span className="font-medium">{new Date(a.deadline).toLocaleString()}</span>
+                  </div>
+                  <div className="mt-1">
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                      Активно
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Link>
+            </Link>
+            {canCreateAssignment && (
+              <button
+                onClick={() => handleDeleteAssignment(a.id)}
+                className="absolute right-2 top-2 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700 opacity-0 transition hover:bg-red-200 group-hover:opacity-100"
+                title="Удалить задание"
+              >
+                🗑️
+              </button>
+            )}
+          </div>
         ))}
         </div>
       </div>

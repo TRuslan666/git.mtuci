@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from fastapi import Path, Query
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -33,6 +33,7 @@ from app.schemas.assignment import (
 )
 from app.services.assignment_service import (
     create_assignment,
+    delete_assignment,
     list_assignments_for_student,
     list_assignments_for_teacher,
 )
@@ -163,6 +164,7 @@ async def create_course_endpoint(
             title=payload.title,
             description=payload.description,
             grade_max=payload.grade_max,
+            target_groups=payload.target_groups,
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -180,7 +182,11 @@ async def list_courses_endpoint(
         return [CourseRead.model_validate(c) for c in courses]
 
     if current_user.role == UserRole.student:
-        courses = await list_student_courses(session, student_id=current_user.id)
+        courses = await list_student_courses(
+            session, 
+            student_id=current_user.id,
+            group_name=current_user.group_name
+        )
         return [CourseRead.model_validate(c) for c in courses]
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -243,23 +249,79 @@ async def enroll_student_endpoint(
 )
 async def create_assignment_endpoint(
     course_id: UUID,
-    payload: AssignmentCreateRequest,
+    title: str = Form(...),
+    description: str | None = Form(None),
+    start_date: str = Form(...),
+    deadline: str = Form(...),
+    late_penalty_periods: str = Form(...),  # JSON string
+    files: list[UploadFile] = File(default=[]),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user),
 ):
     if current_user.role != UserRole.teacher:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access only")
 
+    import json
+    from datetime import datetime
+    
+    try:
+        penalty_periods = json.loads(late_penalty_periods)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid late_penalty_periods JSON")
+    
+    try:
+        start_dt = datetime.fromisoformat(start_date)
+        deadline_dt = datetime.fromisoformat(deadline)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format")
+    
+    # Validate deadline is not in the past
+    now = datetime.now(timezone.utc)
+    if deadline_dt < now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deadline cannot be in the past")
+    
+    # Validate start_date is not after deadline
+    if start_dt > deadline_dt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start date cannot be after deadline")
+
+    # Process uploaded files
+    file_infos = []
+    import os
+    import shutil
+    from pathlib import Path
+    
+    UPLOAD_DIR = Path("/app/uploads/assignments")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    
+    for file in files:
+        if file.filename:
+            file_id = str(uuid4())
+            ext = Path(file.filename).suffix
+            storage_name = f"{file_id}{ext}"
+            storage_path = UPLOAD_DIR / storage_name
+            
+            # Save file
+            with open(storage_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            
+            file_infos.append({
+                "original_filename": file.filename,
+                "storage_path": str(storage_path),
+                "content_type": file.content_type,
+                "file_size": os.path.getsize(storage_path),
+            })
+
     try:
         assignment = await create_assignment(
             session,
             teacher_id=current_user.id,
             course_id=course_id,
-            title=payload.title,
-            description=payload.description,
-            start_date=payload.start_date,
-            deadline=payload.deadline,
-            late_penalty_periods=payload.late_penalty_periods,
+            title=title,
+            description=description,
+            start_date=start_dt,
+            deadline=deadline_dt,
+            late_penalty_periods=penalty_periods,
+            files=file_infos if file_infos else None,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
@@ -294,12 +356,39 @@ async def list_assignments_endpoint(
                 session,
                 student_id=current_user.id,
                 course_id=course_id,
+                student_group_name=current_user.group_name,
             )
         except PermissionError as e:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
         return [AssignmentRead.model_validate(a) for a in assignments]
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+
+@router.delete(
+    "/courses/{course_id}/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_assignment_endpoint(
+    course_id: UUID,
+    assignment_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != UserRole.teacher:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access only")
+
+    try:
+        await delete_assignment(
+            session,
+            teacher_id=current_user.id,
+            course_id=course_id,
+            assignment_id=assignment_id,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(

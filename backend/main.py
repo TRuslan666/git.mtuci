@@ -12,10 +12,18 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.users import router as users_router
 from app.api.routes.courses import router as courses_router
 from app.api.routes.repositories import router as repositories_router
+from app.api.routes.groups import router as groups_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.user import User, UserRole
+from app.models.assignment_file import AssignmentFile  # Import BEFORE Assignment
+from app.models.assignment import Assignment
+from app.models.course import Course
+from app.models.course_enrollment import CourseEnrollment
+from app.models.repository import Repository
+from app.models.student_repository import StudentRepository
+from app.models.submission import Submission
 from sqlalchemy import select
 
 
@@ -30,6 +38,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(users_router)
 app.include_router(courses_router)
+app.include_router(groups_router)
 app.include_router(repositories_router, prefix="/repositories")
 
 # Development CORS:

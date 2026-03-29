@@ -18,12 +18,14 @@ async def create_course(
     title: str,
     description: str | None,
     grade_max: int,
+    target_groups: list[str] | None = None,
 ) -> Course:
     course = Course(
         title=title,
         description=description,
         teacher_id=teacher_id,
         grade_max=grade_max,
+        target_groups=target_groups,
     )
     session.add(course)
     await session.commit()
@@ -31,15 +33,45 @@ async def create_course(
     return course
 
 
+async def _get_enrolled_counts(session: AsyncSession, course_ids: list[UUID]) -> dict[UUID, int]:
+    """Get enrolled student counts for given course IDs."""
+    if not course_ids:
+        return {}
+    from sqlalchemy import func
+    result = await session.execute(
+        select(CourseEnrollment.course_id, func.count().label("count"))
+        .where(CourseEnrollment.course_id.in_(course_ids))
+        .group_by(CourseEnrollment.course_id)
+    )
+    return {row[0]: row[1] for row in result.all()}
+
+
 async def list_teacher_courses(session: AsyncSession, *, teacher_id: UUID) -> list[Course]:
     result = await session.execute(
         select(Course).where(Course.teacher_id == teacher_id).order_by(Course.created_at.desc())
     )
-    return list(result.scalars().all())
+    courses = list(result.scalars().all())
+    
+    # Get enrolled counts
+    counts = await _get_enrolled_counts(session, [c.id for c in courses])
+    for course in courses:
+        course.enrolled_count = counts.get(course.id, 0)
+    
+    return courses
 
 
-async def list_student_courses(session: AsyncSession, *, student_id: UUID) -> list[Course]:
-    result = await session.execute(
+async def list_student_courses(session: AsyncSession, *, student_id: UUID, group_name: str | None = None) -> list[Course]:
+    """List courses available to student.
+    
+    Returns courses that:
+    - Student is enrolled in, OR
+    - Have no target_groups set (available to all), OR
+    - Have student's group in target_groups
+    """
+    from sqlalchemy import or_
+    
+    # Get courses student is enrolled in
+    enrolled_q = await session.execute(
         select(Course)
         .join(
             CourseEnrollment,
@@ -48,7 +80,51 @@ async def list_student_courses(session: AsyncSession, *, student_id: UUID) -> li
         .where(CourseEnrollment.student_id == student_id)
         .order_by(Course.created_at.desc())
     )
-    return list(result.scalars().all())
+    enrolled_courses = list(enrolled_q.scalars().all())
+    
+    # Get courses available to student's group (or all if no target_groups)
+    if group_name:
+        # Courses with no target_groups OR courses including student's group
+        available_q = await session.execute(
+            select(Course)
+            .where(
+                or_(
+                    Course.target_groups.is_(None),
+                    Course.target_groups == [],
+                    Course.target_groups.any(group_name)
+                )
+            )
+            .order_by(Course.created_at.desc())
+        )
+    else:
+        # Only courses with no target_groups (available to all)
+        available_q = await session.execute(
+            select(Course)
+            .where(
+                or_(
+                    Course.target_groups.is_(None),
+                    Course.target_groups == []
+                )
+            )
+            .order_by(Course.created_at.desc())
+        )
+    
+    available_courses = list(available_q.scalars().all())
+    
+    # Combine and deduplicate
+    seen_ids = set()
+    result_courses = []
+    for course in enrolled_courses + available_courses:
+        if course.id not in seen_ids:
+            seen_ids.add(course.id)
+            result_courses.append(course)
+    
+    # Get enrolled counts for all courses
+    counts = await _get_enrolled_counts(session, [c.id for c in result_courses])
+    for course in result_courses:
+        course.enrolled_count = counts.get(course.id, 0)
+    
+    return result_courses
 
 
 async def delete_teacher_course(

@@ -171,14 +171,14 @@ async def login(
     if not user_obj:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail="Неверный email или пароль",
         )
 
     is_password_valid = verify_password(payload.password, user_obj.password_hash)
     if not is_password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail="Неверный email или пароль",
         )
 
     if getattr(user_obj, "is_blocked", False):
