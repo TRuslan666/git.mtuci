@@ -20,6 +20,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserRead
 from app.services.password_reset_service import request_password_reset, reset_password_by_token
 from app.services.mtuci_service import fetch_student_info, MTUCIAuthError, MTUCIServiceError
+from app.services.user_service import get_next_student_id
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -40,11 +41,15 @@ async def register(
     # Хешируем пароль через bcrypt (пароль не храним в открытом виде).
     password_hash = bcrypt.hashpw(payload.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+    # Генерируем student_id автоматически
+    student_id = await get_next_student_id(session)
+
     user = User(
         email=str(payload.email),
         password_hash=password_hash,
         full_name=payload.full_name,
         role=UserRole.student,
+        student_id=student_id,
     )
     session.add(user)
     await session.commit()
@@ -104,12 +109,16 @@ async def register_student_mtuci(
         payload.password.encode("utf-8"), bcrypt.gensalt()
     ).decode("utf-8")
 
+    # Генерируем student_id автоматически
+    student_id = await get_next_student_id(session)
+
     user = User(
         email=str(payload.email),
         password_hash=password_hash,
         full_name=full_name,
         role=UserRole.student,
         group_name=group_name,
+        student_id=student_id,
         mtuci_login=payload.mtuci_login if mtuci_info else None,
         mtuci_password=payload.mtuci_password if mtuci_info else None,
     )

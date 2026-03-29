@@ -31,16 +31,38 @@ async def authenticate_user(session: AsyncSession, email: str, password: str) ->
     return user
 
 
-async def register_user(session: AsyncSession, *, email: str, password: str, full_name: str) -> User:
+async def get_next_student_id(session: AsyncSession) -> str:
+    """Generate next student ID like '1', '2', '3', etc. Uses max+1 logic."""
+    from sqlalchemy import func, cast, Integer
+    from sqlalchemy.sql import select
+    
+    # Find max student_id as integer
+    result = await session.execute(
+        select(func.max(cast(User.student_id, Integer)))
+        .select_from(User)
+        .where(User.student_id.isnot(None))
+    )
+    max_id = result.scalar()
+    
+    next_id = (max_id or 0) + 1
+    return str(next_id)
+
+
+async def register_user(session: AsyncSession, *, email: str, password: str, full_name: str, auto_student_id: bool = True) -> User:
     existing = await get_user_by_email(session, email)
     if existing:
         raise ValueError("Email already registered")
+
+    student_id = None
+    if auto_student_id:
+        student_id = await get_next_student_id(session)
 
     user = User(
         email=email,
         password_hash=hash_password(password),
         full_name=full_name,
         role=UserRole.student,
+        student_id=student_id,
     )
     session.add(user)
     await session.commit()
@@ -68,10 +90,17 @@ async def update_user_role_and_block(
 
     user.role = role
     user.is_blocked = is_blocked
+    
+    # Clear student_id if role is not student (works for teacher, admin)
+    # Compare by value to handle both enum and string inputs
+    role_value = role.value if hasattr(role, 'value') else str(role)
+    if role_value != "student":
+        user.student_id = None
+    elif student_id is not None:
+        user.student_id = student_id
+    
     if group_name is not None:
         user.group_name = group_name
-    if student_id is not None:
-        user.student_id = student_id
     session.add(user)
     await session.commit()
     await session.refresh(user)

@@ -148,7 +148,15 @@ export default function AdminPage() {
                     <td className="px-4 py-3">
                       <select
                         value={edit.role}
-                        onChange={(e) => setEdit(u.id, { role: e.target.value as UserRole })}
+                        onChange={(e) => {
+                          const newRole = e.target.value as UserRole;
+                          const updates: Partial<UserEdit> = { role: newRole };
+                          // Clear student_id if role changed to non-student
+                          if (newRole !== "student") {
+                            updates.student_id = null;
+                          }
+                          setEdit(u.id, updates);
+                        }}
                         disabled={isBusy}
                         className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
                       >
@@ -170,14 +178,16 @@ export default function AdminPage() {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        value={edit.student_id ?? ""}
-                        onChange={(e) => setEdit(u.id, { student_id: e.target.value || null })}
-                        disabled={isBusy}
-                        placeholder="Student ID"
-                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
-                      />
+                      {edit.role === "student" ? (
+                        <input
+                          type="text"
+                          value={edit.student_id ?? ""}
+                          onChange={(e) => setEdit(u.id, { student_id: e.target.value || null })}
+                          disabled={isBusy}
+                          placeholder="Student ID"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
+                        />
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <label className="flex items-center gap-2">
