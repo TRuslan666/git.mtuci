@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional, List
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
+
+class CourseCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    grade_max: int = 100
+    target_groups: Optional[List[str]] = None
+
+
+class CourseUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    grade_max: Optional[int] = None
+    target_groups: Optional[List[str]] = None
+
+
+class CourseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    description: Optional[str]
+    grade_max: int
+    target_groups: Optional[List[str]] = None
+    teacher_id: UUID
+    created_at: datetime
+
+
+class CourseEnrollmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    student_id: UUID
+    enrolled_at: datetime
+

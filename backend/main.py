@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+import os
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+from app.api.routes.auth import router as auth_router
+from app.api.routes.admin import router as admin_router
+from app.api.routes.users import router as users_router
+from app.api.routes.courses import router as courses_router
+from app.api.routes.repositories import router as repositories_router
+from app.core.config import settings
+from app.core.database import SessionLocal
+from app.core.security import hash_password
+from app.models.user import User, UserRole
+from sqlalchemy import select
+
+
+app = FastAPI(title="MTUCI Lab Submission API", version="0.1.0")
+
+# Mount uploads directory for serving avatar images
+uploads_dir = Path(settings.UPLOAD_DIR)
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+app.include_router(auth_router)
+app.include_router(admin_router)
+app.include_router(users_router)
+app.include_router(courses_router)
+app.include_router(repositories_router, prefix="/repositories")
+
+# Development CORS:
+# Frontend runs on http://localhost:3001 and API on http://localhost:8000.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+
+@app.middleware("http")
+async def force_utf8_charset(request: Request, call_next):
+    response = await call_next(request)
+    content_type = response.headers.get("content-type")
+    if content_type and "charset=" not in content_type.lower():
+        response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    return response
+
+
+@app.get("/", tags=["health"])
+async def health_check():
+    return {"status": "ok"}
+
+
+@app.on_event("startup")
+async def create_super_admin_if_missing() -> None:
+    admin_email = (os.getenv("ADMIN_EMAIL") or "").strip()
+    admin_password = os.getenv("ADMIN_PASSWORD") or ""
+    if not admin_email or not admin_password:
+        return
+
+    try:
+        async with SessionLocal() as session:
+            result = await session.execute(select(User).where(User.email == admin_email))
+            existing = result.scalar_one_or_none()
+
+            if not existing:
+                existing = User(
+                    email=admin_email,
+                    password_hash=hash_password(admin_password),
+                    full_name="Super Admin",
+                    role=UserRole.admin,
+                    is_blocked=False,
+                )
+                session.add(existing)
+                await session.commit()
+                await session.refresh(existing)
+            else:
+                # На случай, если пользователь уже существует, гарантируем права супер-админа.
+                existing.role = UserRole.admin
+                existing.is_blocked = False
+                session.add(existing)
+                await session.commit()
+    except Exception as e:
+        # Не валим старт сервиса из-за проблем с созданием админа.
+        print(f"[startup] Failed to create super admin: {e}")
+

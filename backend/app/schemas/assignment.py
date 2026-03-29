@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal, Optional
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+
+class AssignmentCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    start_date: datetime
+    deadline: datetime
+    late_penalty_periods: list[dict[str, int]] = Field(default_factory=list)
+
+    @field_validator("late_penalty_periods")
+    @classmethod
+    def validate_late_penalty_periods(cls, value: list[dict[str, int]]) -> list[dict[str, int]]:
+        prev_weeks: int | None = None
+        prev_max_grade: int | None = None
+        for idx, period in enumerate(value):
+            if "weeks" not in period or "max_grade" not in period:
+                raise ValueError("Each penalty period must contain 'weeks' and 'max_grade'")
+            weeks = int(period["weeks"])
+            max_grade = int(period["max_grade"])
+            if weeks <= 0:
+                raise ValueError("Penalty period weeks must be greater than 0")
+            if max_grade < 0:
+                raise ValueError("Penalty period max_grade must be greater than or equal to 0")
+            if prev_weeks is not None and weeks <= prev_weeks:
+                raise ValueError("Penalty periods must be sorted by weeks in ascending order")
+            if prev_max_grade is not None and max_grade >= prev_max_grade:
+                raise ValueError("Максимальная оценка должна убывать с увеличением срока просрочки")
+            prev_weeks = weeks
+            prev_max_grade = max_grade
+        return value
+
+
+class AssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    title: str
+    description: Optional[str]
+    start_date: datetime
+    deadline: datetime
+    late_penalty_periods: list[dict[str, int]]
+    gitea_repo_name: Optional[str]
+    created_at: datetime
+
+
+class GiteaCommitAuthorRead(BaseModel):
+    name: str
+    email: EmailStr | None = None
+
+
+class GiteaCommitRead(BaseModel):
+    sha: str
+    message: str
+    author: GiteaCommitAuthorRead
+    date: datetime
+
+
+class AssignmentSubmissionStatusRead(BaseModel):
+    student_id: UUID
+    student_full_name: str
+    status: Literal["submitted", "not_submitted"]
+    last_commit_at: datetime | None = None
+    grade: int | None = None
+    final_grade: float | None = None
+    penalty_points: float = 0.0
+    weeks_late: int = 0
+    late_max_grade: float | None = None
+    comment: str | None = None
+    submitted_at: datetime | None = None
+    graded_at: datetime | None = None
+
+
+class GradeSubmissionRequest(BaseModel):
+    grade: int
+    comment: str | None = None
+
+
+class MyGradeRead(BaseModel):
+    grade: int | None = None
+    final_grade: float | None = None
+    penalty_points: float = 0.0
+    weeks_late: int = 0
+    late_max_grade: float | None = None
+    comment: str | None = None
+    graded_at: datetime | None = None
+    grade_max: int = 100
+
+
+class PlagiarismStudentRead(BaseModel):
+    id: UUID
+    full_name: str
+    email: EmailStr
+
+
+class PlagiarismPairRead(BaseModel):
+    student1: PlagiarismStudentRead
+    student2: PlagiarismStudentRead
+    similarity: float
+    verdict: Literal["high", "medium", "low"]
+
+
+class PlagiarismCheckRead(BaseModel):
+    pairs: list[PlagiarismPairRead]
+    checked_at: datetime
+
+
+class PlagiarismCompareRequest(BaseModel):
+    student1_id: UUID
+    student2_id: UUID
+
+
+class PlagiarismLineCompareRead(BaseModel):
+    line: str
+    status: Literal["exact", "similar", "different"]
+
+
+class PlagiarismCompareRead(BaseModel):
+    similarity: float
+    verdict: Literal["high", "medium", "low"]
+    common_features: list[str]
+    lines1: list[PlagiarismLineCompareRead]
+    lines2: list[PlagiarismLineCompareRead]
+
+
+class GiteaRepoFileRead(BaseModel):
+    sha: str
+    name: str
+    type: Literal["file", "dir"]
+    size: int | None = None
+
+
+class GiteaFileContentRead(BaseModel):
+    filepath: str
+    content: str
+

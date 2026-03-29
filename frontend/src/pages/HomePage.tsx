@@ -1,0 +1,266 @@
+import { useEffect, useState } from "react";
+import { getMe } from "../api/authApi";
+import { getCourses } from "../api/coursesApi";
+import type { UserRead, Course as CourseType } from "../api/types";
+
+interface Activity {
+  id: string;
+  text: string;
+  type: "submission" | "comment" | "deadline";
+}
+
+interface Course {
+  id: string;
+  name: string;
+  rating: number;
+}
+
+interface Deadline {
+  id: string;
+  time: string;
+  title: string;
+  urgency: "today" | "tomorrow" | "later";
+}
+
+interface StudentRating {
+  id: string;
+  name: string;
+  points: number;
+}
+
+const mockActivities: Activity[] = [
+  { id: "1", text: "Сдал лаб. работу №3 (оценка 85)", type: "submission" },
+  { id: "2", text: "Новый комментарий от преподавателя", type: "comment" },
+  { id: "3", text: "Дедлайн через 2 дня: Лаб. №4", type: "deadline" },
+];
+
+interface CourseDisplay {
+  id: string;
+  name: string;
+  rating: number;
+}
+
+const mockCourses: CourseDisplay[] = [
+  { id: "1", name: "Базы данных", rating: 4 },
+  { id: "2", name: "Web разработка", rating: 3 },
+  { id: "3", name: "Python продвин.", rating: 5 },
+];
+
+const mockDeadlines: Deadline[] = [
+  { id: "1", time: "17:00", title: "Лаб. №3", urgency: "today" },
+  { id: "2", time: "23:59", title: "Тест по БД", urgency: "tomorrow" },
+  { id: "3", time: "", title: "Курсовая", urgency: "later" },
+];
+
+const mockRatings: StudentRating[] = [
+  { id: "1", name: "Петров И.", points: 450 },
+  { id: "2", name: "Иванов А.", points: 420 },
+  { id: "3", name: "Сидоров К.", points: 380 },
+];
+
+function getActivityIcon(type: Activity["type"]) {
+  switch (type) {
+    case "submission":
+      return "✅";
+    case "comment":
+      return "💬";
+    case "deadline":
+      return "🔥";
+  }
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <span className="text-yellow-500">
+      {Array.from({ length: 5 }).map((_, i) =>
+        i < rating ? "⭐" : "☆"
+      )}
+    </span>
+  );
+}
+
+function getUrgencyLabel(urgency: Deadline["urgency"]) {
+  switch (urgency) {
+    case "today":
+      return "Сегодня";
+    case "tomorrow":
+      return "Завтра";
+    case "later":
+      return "Через 3 дня";
+  }
+}
+
+function getUrgencyColor(urgency: Deadline["urgency"]) {
+  switch (urgency) {
+    case "today":
+      return "text-red-600 font-medium";
+    case "tomorrow":
+      return "text-orange-600";
+    case "later":
+      return "text-gray-600";
+  }
+}
+
+export default function HomePage() {
+  const [user, setUser] = useState<UserRead | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedCourse, setSelectedCourse] = useState<string>("all");
+  const [courses, setCourses] = useState<CourseType[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadData() {
+      try {
+        const [me, coursesData] = await Promise.all([getMe(), getCourses()]);
+        if (!cancelled) {
+          setUser(me);
+          setCourses(coursesData);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setCoursesLoading(false);
+        }
+      }
+    }
+    loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const weeklyProgress = 75;
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      {/* Приветствие */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          👋 Привет, {loading ? "..." : user?.full_name || user?.email || "Иван"}!
+        </h1>
+      </div>
+
+      {/* Основная сетка: контент + сайдбар */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Левая колонка (основной контент) */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Активность за неделю */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">📊 Активность за неделю</h2>
+              </div>
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 outline-none focus:border-[#372579] focus:ring-1 focus:ring-[#372579]"
+              >
+                <option value="all">Все курсы ▼</option>
+                {coursesLoading ? (
+                  <option disabled>Загрузка...</option>
+                ) : courses.length === 0 ? (
+                  <option disabled>Нет курсов</option>
+                ) : (
+                  courses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.title}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Прогресс бар */}
+            <div className="mb-2">
+              <div className="h-3 w-full rounded-full bg-gray-200">
+                <div
+                  className="h-3 rounded-full bg-[#372579] transition-all"
+                  style={{ width: `${weeklyProgress}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-700">{weeklyProgress}%</div>
+          </div>
+
+          {/* Последние действия */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">🔥 Последние действия</h2>
+            <ul className="space-y-2">
+              {mockActivities.map((activity) => (
+                <li key={activity.id} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span>{getActivityIcon(activity.type)}</span>
+                  <span>{activity.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Активные курсы */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">📚 Активные курсы</h2>
+            {coursesLoading ? (
+              <div className="text-sm text-gray-600">Загрузка курсов...</div>
+            ) : courses.length === 0 ? (
+              <div className="text-sm text-gray-600">Нет доступных курсов</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {courses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="rounded-lg border border-gray-200 bg-[#faf9fd] p-4 transition hover:border-[#d4cfe6] hover:shadow-md"
+                  >
+                    <div className="mb-2 text-sm font-medium text-gray-900">{course.title}</div>
+                    <div className="text-xs text-gray-500">{course.description || "Без описания"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Правая колонка (сайдбар) */}
+        <div className="space-y-6">
+          {/* Дедлайны */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">📅 Дедлайны</h2>
+            <ul className="space-y-3">
+              {mockDeadlines.map((deadline) => (
+                <li key={deadline.id} className="border-l-2 border-gray-200 pl-3">
+                  <div className={`text-xs ${getUrgencyColor(deadline.urgency)}`}>
+                    {getUrgencyLabel(deadline.urgency)} {deadline.time}
+                  </div>
+                  <div className="text-sm text-gray-700">{deadline.title}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Рейтинг */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">🏆 Рейтинг</h2>
+            <ul className="space-y-2">
+              {mockRatings.map((student, index) => (
+                <li key={student.id} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700">
+                    <span className="mr-2 font-medium text-gray-500">{index + 1}.</span>
+                    {student.name}
+                  </span>
+                  <span className="font-medium text-[#372579]">{student.points}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Советы */}
+          <div className="rounded-xl border border-[#d4cfe6] bg-[#faf9fd] p-5 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">💡 Советы</h2>
+            <p className="text-sm italic text-gray-600">"Не забудь push"</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
