@@ -91,13 +91,20 @@ async def update_user_role_and_block(
     user.role = role
     user.is_blocked = is_blocked
     
-    # Clear student_id if role is not student (works for teacher, admin)
     # Compare by value to handle both enum and string inputs
     role_value = role.value if hasattr(role, 'value') else str(role)
+    
     if role_value != "student":
+        # Clear student_id for non-student roles
         user.student_id = None
-    elif student_id is not None:
-        user.student_id = student_id
+    else:
+        # Role is student - assign student_id
+        if student_id is not None:
+            # Use provided ID (from admin panel)
+            user.student_id = student_id
+        elif not user.student_id:
+            # Generate new incremental ID if none exists
+            user.student_id = await get_next_student_id(session)
     
     if group_name is not None:
         user.group_name = group_name

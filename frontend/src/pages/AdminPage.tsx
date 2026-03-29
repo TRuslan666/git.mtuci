@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import type { AdminUserRead, UserRole } from "../api/types";
 import { getAdminUsers, patchAdminUser, resetAdminUserPassword, deleteAdminUser } from "../api/adminApi";
 
@@ -11,38 +11,33 @@ export default function AdminPage() {
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, UserEdit>>({});
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const list = await getAdminUsers();
-        if (cancelled) return;
-        setUsers(list);
-        const initialEdits: Record<string, UserEdit> = {};
-        for (const u of list) {
-          initialEdits[u.id] = { 
-            role: u.role, 
-            is_blocked: u.is_blocked,
-            group_name: u.group_name ?? null,
-            student_id: u.student_id ?? null,
-          };
-        }
-        setEdits(initialEdits);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load users");
-      } finally {
-        if (!cancelled) setLoading(false);
+  // Expose load function for reuse
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await getAdminUsers();
+      setUsers(list);
+      const initialEdits: Record<string, UserEdit> = {};
+      for (const u of list) {
+        initialEdits[u.id] = { 
+          role: u.role, 
+          is_blocked: u.is_blocked,
+          group_name: u.group_name ?? null,
+          student_id: u.student_id ?? null,
+        };
       }
+      setEdits(initialEdits);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load users");
+    } finally {
+      setLoading(false);
     }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const roleOptions: UserRole[] = useMemo(() => ["student", "teacher", "admin"], []);
 
@@ -53,9 +48,8 @@ export default function AdminPage() {
     setUpdatingUserId(user.id);
     setError(null);
     try {
-      const updated = await patchAdminUser(user.id, edit);
-      setUsers((prev) => prev.map((u) => (u.id === user.id ? updated : u)));
-      setEdits((prev) => ({ ...prev, [user.id]: { role: updated.role, is_blocked: updated.is_blocked, group_name: updated.group_name ?? null, student_id: updated.student_id ?? null } }));
+      await patchAdminUser(user.id, edit);
+      await load(); // Reload all data to get fresh student_id from server
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update user");
     } finally {
@@ -148,14 +142,30 @@ export default function AdminPage() {
                     <td className="px-4 py-3">
                       <select
                         value={edit.role}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const newRole = e.target.value as UserRole;
                           const updates: Partial<UserEdit> = { role: newRole };
-                          // Clear student_id if role changed to non-student
+                          // Clear student_id and group if role changed to non-student
                           if (newRole !== "student") {
                             updates.student_id = null;
+                            updates.group_name = null;
                           }
+                          
+                          // Compute new edit state
+                          const newEdit = { ...edit, ...updates };
                           setEdit(u.id, updates);
+                          
+                          // Auto-save immediately when role changes
+                          setUpdatingUserId(u.id);
+                          setError(null);
+                          try {
+                            await patchAdminUser(u.id, newEdit);
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Failed to update user");
+                          } finally {
+                            setUpdatingUserId(null);
+                          }
                         }}
                         disabled={isBusy}
                         className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
@@ -168,14 +178,16 @@ export default function AdminPage() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        value={edit.group_name ?? ""}
-                        onChange={(e) => setEdit(u.id, { group_name: e.target.value || null })}
-                        disabled={isBusy}
-                        placeholder="Group name"
-                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
-                      />
+                      {edit.role === "student" ? (
+                        <input
+                          type="text"
+                          value={edit.group_name ?? ""}
+                          onChange={(e) => setEdit(u.id, { group_name: e.target.value || null })}
+                          disabled={isBusy}
+                          placeholder="Group name"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500"
+                        />
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       {edit.role === "student" ? (
