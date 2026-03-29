@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import math
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from fastapi import Path, Query

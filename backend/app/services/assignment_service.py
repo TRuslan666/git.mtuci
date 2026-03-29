@@ -149,9 +149,19 @@ async def list_assignments_for_student(
         if not can_access:
             raise PermissionError("Not enrolled and no access")
         
-        # Auto-enroll student
-        enrollment = CourseEnrollment(course_id=course_id, student_id=student_id)
-        session.add(enrollment)
+        # Auto-enroll student (check if already enrolled first)
+        existing_enrollment_q = await session.execute(
+            select(CourseEnrollment).where(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.student_id == student_id,
+            )
+        )
+        existing_enrollment = existing_enrollment_q.scalar_one_or_none()
+        
+        if not existing_enrollment:
+            enrollment = CourseEnrollment(course_id=course_id, student_id=student_id)
+            session.add(enrollment)
+            await session.flush()
         
         # Create repos for all existing assignments
         assignments_q = await session.execute(
@@ -165,8 +175,8 @@ async def list_assignments_for_student(
                 student_id=student_id,
             )
         
-        await session.commit()
-        await session.refresh(enrollment)
+        if not existing_enrollment:
+            await session.commit()
 
     result = await session.execute(
         select(Assignment)
