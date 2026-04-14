@@ -50,6 +50,23 @@ export interface BackupInfo {
   next_backup: string | null;
 }
 
+export interface FacultyCommitsStat {
+  faculty: string;
+  short_name: string;
+  commits: number;
+  color: string;
+}
+
+export interface ActiveRepositoryStat {
+  id: string;
+  name: string;
+  author: string;
+  commits: number;
+  is_public: boolean;
+  initials: string;
+  color: string;
+}
+
 export interface Course {
   id: string;
   title: string;

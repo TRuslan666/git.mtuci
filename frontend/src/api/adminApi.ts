@@ -63,3 +63,28 @@ export async function createBackup(): Promise<{ success: boolean; file: string; 
   return apiRequest<{ success: boolean; file: string; message: string }>("/admin/backups/create", { method: "POST" });
 }
 
+export interface FacultyCommitsStat {
+  faculty: string;
+  short_name: string;
+  commits: number;
+  color: string;
+}
+
+export async function getCommitsByFaculty(): Promise<FacultyCommitsStat[]> {
+  return apiRequest<FacultyCommitsStat[]>("/stats/commits-by-faculty");
+}
+
+export interface ActiveRepositoryStat {
+  id: string;
+  name: string;
+  author: string;
+  commits: number;
+  is_public: boolean;
+  initials: string;
+  color: string;
+}
+
+export async function getActiveRepositories(limit: number = 5): Promise<ActiveRepositoryStat[]> {
+  return apiRequest<ActiveRepositoryStat[]>(`/stats/active-repositories?limit=${limit}`);
+}
+

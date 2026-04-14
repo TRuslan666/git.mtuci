@@ -19,19 +19,16 @@ import {
   CheckCircle2,
   AlertTriangle,
   GitPullRequest,
+  BellOff,
+  X,
+  Search,
+  Filter,
+  type LucideIcon,
 } from "lucide-react";
 import type { AdminUserRead } from "../api/types";
-import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBackup } from "../api/adminApi";
-import type { SystemMetrics, ServiceStatus, BackupInfo } from "../api/types";
+import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBackup, getCommitsByFaculty, getActiveRepositories } from "../api/adminApi";
+import type { SystemMetrics, ServiceStatus, BackupInfo, FacultyCommitsStat, ActiveRepositoryStat } from "../api/types";
 import toast from "react-hot-toast";
-
-const mockRepositories = [
-  { id: "1", name: "algorithms-course", author: "Иван Петров", commits: 24, isPublic: true, initials: "ИП", color: "bg-blue-500/20 text-blue-400" },
-  { id: "2", name: "web-project-2024", author: "Мария Сидорова", commits: 18, isPublic: false, initials: "МС", color: "bg-purple-500/20 text-purple-400" },
-  { id: "3", name: "database-labs", author: "Алексей Козлов", commits: 31, isPublic: true, initials: "АК", color: "bg-green-500/20 text-green-400" },
-  { id: "4", name: "ml-research", author: "Ольга Новикова", commits: 12, isPublic: false, initials: "ОН", color: "bg-orange-500/20 text-orange-400" },
-  { id: "5", name: "frontend-course", author: "Дмитрий Смирнов", commits: 45, isPublic: true, initials: "ДС", color: "bg-pink-500/20 text-pink-400" },
-];
 
 interface Stats {
   total: number;
@@ -46,6 +43,45 @@ interface StatCardProps {
   trend: string;
   trendUp: boolean;
   icon: React.ElementType;
+}
+
+interface Notification {
+  id: string;
+  type: 'critical' | 'warning' | 'info' | 'success';
+  title: string;
+  message: string;
+  timestamp: string;
+  category: 'server' | 'users' | 'git' | 'edu';
+}
+
+function getIcon(type: Notification['type']): LucideIcon {
+  switch (type) {
+    case 'critical':
+      return AlertOctagon;
+    case 'warning':
+      return AlertTriangle;
+    case 'info':
+      return Info;
+    case 'success':
+      return CheckCircle2;
+    default:
+      return Info;
+  }
+}
+
+function getNotificationColor(type: Notification['type']): string {
+  switch (type) {
+    case 'critical':
+      return 'text-red-500 bg-red-500';
+    case 'warning':
+      return 'text-yellow-500 bg-yellow-500';
+    case 'info':
+      return 'text-blue-500 bg-blue-500';
+    case 'success':
+      return 'text-green-500 bg-green-500';
+    default:
+      return 'text-blue-500 bg-blue-500';
+  }
 }
 
 function StatCard({ title, value, trend, trendUp, icon: Icon }: StatCardProps) {
@@ -93,15 +129,30 @@ export default function AdminPage() {
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [facultyStats, setFacultyStats] = useState<FacultyCommitsStat[]>([]);
+  const [facultyStatsLoading, setFacultyStatsLoading] = useState(false);
+  const [activeRepositories, setActiveRepositories] = useState<ActiveRepositoryStat[]>([]);
+  const [activeRepositoriesLoading, setActiveRepositoriesLoading] = useState(false);
+  const [showRepoDropdown, setShowRepoDropdown] = useState(false);
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFacultyStatsLoading(true);
+    setActiveRepositoriesLoading(true);
     try {
-      const [list, sysMetrics, svcStatus, backups] = await Promise.all([
+      const [list, sysMetrics, svcStatus, backups, facultyData, repoData] = await Promise.all([
         getAdminUsers(),
         getSystemMetrics().catch(() => null),
         getServiceStatus().catch(() => null),
         getBackups().catch(() => null),
+        getCommitsByFaculty().catch(() => []),
+        getActiveRepositories(5).catch(() => []),
       ]);
       setUsers(list);
       setStats({
@@ -113,6 +164,65 @@ export default function AdminPage() {
       setMetrics(sysMetrics);
       setServiceStatus(svcStatus);
       setBackupInfo(backups);
+      setFacultyStats(facultyData);
+      setActiveRepositories(repoData);
+
+      // Check system metrics and add notifications if needed
+      if (sysMetrics) {
+        const newNotifications: Notification[] = [];
+        
+        // Check disk usage
+        if (sysMetrics.disk_usage >= 85) {
+          newNotifications.push({
+            id: `disk-${Date.now()}`,
+            type: sysMetrics.disk_usage >= 95 ? 'critical' : 'warning',
+            title: 'Диск переполнен',
+            message: `Использовано ${sysMetrics.disk_usage}% дискового пространства`,
+            timestamp: 'только что',
+            category: 'server',
+          });
+        }
+        
+        // Check memory usage
+        if (sysMetrics.memory_usage >= 90) {
+          newNotifications.push({
+            id: `mem-${Date.now()}`,
+            type: 'critical',
+            title: 'Высокая загрузка RAM',
+            message: `Использовано ${sysMetrics.memory_usage}% оперативной памяти`,
+            timestamp: 'только что',
+            category: 'server',
+          });
+        }
+        
+        // Check CPU usage
+        if (sysMetrics.cpu_usage >= 95) {
+          newNotifications.push({
+            id: `cpu-${Date.now()}`,
+            type: 'warning',
+            title: 'Высокая загрузка CPU',
+            message: `CPU загружен на ${sysMetrics.cpu_usage}%`,
+            timestamp: 'только что',
+            category: 'server',
+          });
+        }
+        
+        // Check service status
+        if (svcStatus && !svcStatus.git) {
+          newNotifications.push({
+            id: `git-${Date.now()}`,
+            type: 'critical',
+            title: 'Git сервис недоступен',
+            message: 'Gitea не отвечает на запросы',
+            timestamp: 'только что',
+            category: 'git',
+          });
+        }
+        
+        if (newNotifications.length > 0) {
+          setNotifications((prev) => [...newNotifications, ...prev]);
+        }
+      }
       setSystemStatus({
         api: svcStatus?.api ? "online" : "offline",
         db: svcStatus?.db ? "online" : "offline",
@@ -121,18 +231,51 @@ export default function AdminPage() {
       setSystemStatus({ api: "offline", db: "offline" });
     } finally {
       setLoading(false);
+      setFacultyStatsLoading(false);
+      setActiveRepositoriesLoading(false);
     }
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showRepoDropdown && !(event.target as Element).closest('.repo-dropdown-container')) {
+        setShowRepoDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRepoDropdown]);
 
   const handleCreateBackup = useCallback(async () => {
     setBackupLoading(true);
     try {
-      await createBackup();
+      const result = await createBackup();
       // Refresh backup info
       const backups = await getBackups();
       setBackupInfo(backups);
+      // Add notification
+      const newNotification: Notification = {
+        id: Date.now().toString(),
+        type: 'success',
+        title: 'Бэкап создан',
+        message: `Файл: ${result.file}`,
+        timestamp: 'только что',
+        category: 'server',
+      };
+      setNotifications((prev) => [newNotification, ...prev]);
       toast.success("Бэкап успешно создан!");
     } catch (err) {
+      // Add error notification
+      const errorNotification: Notification = {
+        id: Date.now().toString(),
+        type: 'critical',
+        title: 'Ошибка бэкапа',
+        message: err instanceof Error ? err.message : "Не удалось создать бэкап",
+        timestamp: 'только что',
+        category: 'server',
+      };
+      setNotifications((prev) => [errorNotification, ...prev]);
       toast.error(err instanceof Error ? err.message : "Ошибка создания бэкапа");
     } finally {
       setBackupLoading(false);
@@ -222,8 +365,8 @@ export default function AdminPage() {
           <div className="lg:col-span-3 bg-white border-gray-200 rounded-xl border shadow-sm transition-colors dark:bg-[#1e1e1e] dark:border-[#2d2d2d]">
             <div className="p-5 flex items-center justify-between border-b border-gray-100 dark:border-[#2d2d2d]">
               <h2 className="text-lg font-semibold text-gray-900 transition-colors dark:text-white">Новые пользователи</h2>
-              <Link to="/admin/users" className="text-sm flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                Все <ArrowRight className="h-4 w-4" />
+              <Link to="/users" className="group text-sm flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                Все <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
             <div className="p-5">
@@ -242,21 +385,21 @@ export default function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#2d2d2d]">
                     {users.map((user) => (
-                      <tr key={user.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
-                        <td className="py-3 pr-8">
+                      <tr key={user.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-[#252525] rounded-lg">
+                        <td className="py-3 pr-8 first:rounded-l-lg last:rounded-r-lg">
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">{user.full_name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
                           </div>
                         </td>
-                        <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300">{user.group_name || "—"}</td>
-                        <td className="py-3 pr-8">
+                        <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300 first:rounded-l-lg last:rounded-r-lg">{user.group_name || "—"}</td>
+                        <td className="py-3 pr-8 first:rounded-l-lg last:rounded-r-lg">
                           <span className="text-sm capitalize text-gray-600 dark:text-gray-300">{user.role}</span>
                         </td>
-                        <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300">
+                        <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300 first:rounded-l-lg last:rounded-r-lg">
                           {new Date(user.created_at).toLocaleDateString("ru-RU")}
                         </td>
-                        <td className="py-3 text-left">
+                        <td className="py-3 text-left first:rounded-l-lg last:rounded-r-lg">
                           {getStatusBadge(user.is_blocked ? "blocked" : "active")}
                         </td>
                       </tr>
@@ -276,26 +419,67 @@ export default function AdminPage() {
           <div className="lg:col-span-2 bg-white border-gray-200 rounded-xl border shadow-sm transition-colors dark:bg-[#1e1e1e] dark:border-[#2d2d2d]">
             <div className="p-5 flex items-center justify-between border-b border-gray-100 dark:border-[#2d2d2d]">
               <h2 className="text-lg font-semibold text-gray-900 transition-colors dark:text-white">Активные репозитории</h2>
-              <button className="text-gray-400 hover:text-gray-600 transition-colors dark:text-gray-500 dark:hover:text-gray-300">
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
+              <div className="relative repo-dropdown-container">
+                <button
+                  onClick={() => setShowRepoDropdown(!showRepoDropdown)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+                {showRepoDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-md shadow-lg dark:bg-[#1e1e1e]/95 dark:border-[#2d2d2d]/50 z-50">
+                    <div className="p-1.5 space-y-0.5">
+                      <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
+                        <Plus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        Создать репозиторий
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
+                        <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        Поиск проекта
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
+                        <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        Фильтр по кафедре
+                      </button>
+                      <div className="h-px bg-gray-200/50 dark:bg-[#2d2d2d]/50 mx-1" />
+                      <button
+                        onClick={() => { setActiveRepositoriesLoading(true); load(); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80"
+                      >
+                        <RotateCcw className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        Обновить список
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="p-5">
               <div className="space-y-4">
-                {mockRepositories.map((repo) => (
-                  <div key={repo.id} className="flex items-center gap-3 rounded-lg p-2 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold ${repo.color}`}>
-                      {repo.initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{repo.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{repo.author} • {repo.commits} коммитов</p>
-                    </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${repo.isPublic ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-500/20" : "text-gray-700 bg-gray-100 dark:text-gray-300 dark:bg-gray-500/20"}`}>
-                      {repo.isPublic ? "Public" : "Private"}
-                    </span>
+                {activeRepositoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                   </div>
-                ))}
+                ) : activeRepositories.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    Нет активных репозиториев
+                  </div>
+                ) : (
+                  activeRepositories.map((repo) => (
+                    <div key={repo.id} className="flex items-center gap-3 rounded-lg p-2 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold ${repo.color}`}>
+                        {repo.initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{repo.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{repo.author} • {repo.commits} коммитов</p>
+                      </div>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${repo.is_public ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-500/20" : "text-gray-700 bg-gray-100 dark:text-gray-300 dark:bg-gray-500/20"}`}>
+                        {repo.is_public ? "Public" : "Private"}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -307,28 +491,54 @@ export default function AdminPage() {
           <div className="bg-white border-gray-200 rounded-xl border shadow-sm transition-colors dark:bg-[#1e1e1e] dark:border-[#2d2d2d]">
             <div className="p-5 flex items-center justify-between border-b border-gray-100 dark:border-[#2d2d2d]">
               <h2 className="text-lg font-semibold text-gray-900 transition-colors dark:text-white">Уведомления</h2>
-              <button className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors dark:text-gray-400 dark:hover:text-gray-300">Очистить</button>
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAllNotifications}
+                  className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  <X className="h-3 w-3" />
+                  Очистить все
+                </button>
+              )}
             </div>
             <div className="p-5">
-              <div className="space-y-4">
-                {[
-                  { icon: AlertOctagon, iconBg: "bg-red-100 dark:bg-red-500/20", iconColor: "text-red-600 dark:text-red-400", text: "Дисковое пространство на 87%", time: "10 минут назад • Сервер 1" },
-                  { icon: Users, iconBg: "bg-yellow-100 dark:bg-yellow-500/20", iconColor: "text-yellow-600 dark:text-yellow-400", text: "Новая регистрация без подтверждения домена", time: "32 мин назад • Пользователи" },
-                  { icon: Cloud, iconBg: "bg-blue-100 dark:bg-blue-500/20", iconColor: "text-blue-600 dark:text-blue-400", text: "Импорт из GitHub: 4 репо (Группа ИСТ-21)", time: "1 час назад • Репозитории" },
-                  { icon: GitCommit, iconBg: "bg-purple-100 dark:bg-purple-500/20", iconColor: "text-purple-600 dark:text-purple-400", text: "Pull request без проверки > 48 ч", time: "5 час назад • Code Review" },
-                  { icon: Info, iconBg: "bg-green-100 dark:bg-green-500/20", iconColor: "text-green-600 dark:text-green-400", text: "Курс «Сети ЭВМ» опубликован", time: "Вчера • Контент" },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-3 rounded-lg p-2 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
-                    <div className={`p-1.5 rounded ${item.iconBg}`}>
-                      <item.icon className={`h-4 w-4 ${item.iconColor}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{item.text}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
+                  <BellOff className="h-10 w-10 mb-3 opacity-50" />
+                  <p className="text-sm">Уведомлений пока нет</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((notification) => {
+                    const Icon = getIcon(notification.type);
+                    const colorClass = getNotificationColor(notification.type);
+                    return (
+                      <div
+                        key={notification.id}
+                        className="flex items-start gap-3 rounded-lg p-3 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]"
+                      >
+                        <div className="mt-0.5">
+                          <div className={`h-2 w-2 rounded-full ${colorClass.split(' ')[1]}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {notification.title}
+                            </p>
+                            <Icon className={`h-4 w-4 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            {notification.timestamp} • {notification.category}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -339,23 +549,27 @@ export default function AdminPage() {
             </div>
             <div className="p-5">
               <div className="space-y-4 mb-6">
-                {[
-                  { name: "Инф. системы", commits: 341, color: "bg-blue-500" },
-                  { name: "Сети и тел.", commits: 265, color: "bg-green-500" },
-                  { name: "Безопасность", commits: 199, color: "bg-purple-500" },
-                  { name: "Математика", commits: 128, color: "bg-orange-500" },
-                  { name: "Иностранные", commits: 48, color: "bg-pink-500" },
-                ].map((dept) => (
-                  <div key={dept.name} className="rounded-lg p-2 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{dept.name}</span>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{dept.commits}</span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden bg-gray-100 dark:bg-[#2d2d2d]">
-                      <div className={`h-full rounded-full ${dept.color}`} style={{ width: `${(dept.commits / 341) * 100}%` }} />
-                    </div>
+                {facultyStatsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                   </div>
-                ))}
+                ) : facultyStats.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    Нет данных о коммитах
+                  </div>
+                ) : (
+                  facultyStats.map((dept) => (
+                    <div key={dept.short_name} className="rounded-lg p-2 -mx-2 transition-colors hover:bg-gray-50 dark:hover:bg-[#252525]">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{dept.faculty}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{dept.commits}</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden bg-gray-100 dark:bg-[#2d2d2d]">
+                        <div className={`h-full rounded-full ${dept.color}`} style={{ width: `${(dept.commits / Math.max(...facultyStats.map(s => s.commits))) * 100}%` }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="border-t border-gray-100 pt-4 dark:border-[#2d2d2d]">

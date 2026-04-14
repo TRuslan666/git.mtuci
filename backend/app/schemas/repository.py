@@ -26,5 +26,8 @@ class RepositoryRead(BaseModel):
     gitea_repo_name: Optional[str]
     clone_url: Optional[str]
     owner_id: UUID
+    owner_full_name: Optional[str] = None
+    commits_count: int = 0
+    is_public: bool = True
     created_at: datetime
     updated_at: datetime

@@ -13,6 +13,7 @@ from app.api.routes.users import router as users_router
 from app.api.routes.courses import router as courses_router
 from app.api.routes.repositories import router as repositories_router
 from app.api.routes.groups import router as groups_router
+from app.api.routes.stats import router as stats_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
@@ -40,6 +41,7 @@ app.include_router(users_router)
 app.include_router(courses_router)
 app.include_router(groups_router)
 app.include_router(repositories_router, prefix="/repositories")
+app.include_router(stats_router)
 
 # Development CORS:
 # Frontend runs on http://localhost:3001 and API on http://localhost:8000.
