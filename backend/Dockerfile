@@ -3,10 +3,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies (for asyncpg, bcrypt, etc)
+# Install system dependencies (for asyncpg, bcrypt, postgresql-client)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
+    postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

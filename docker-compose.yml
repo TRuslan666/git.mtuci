@@ -16,6 +16,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backups:/backups
     working_dir: /app
     env_file:
       - ./backend/.env

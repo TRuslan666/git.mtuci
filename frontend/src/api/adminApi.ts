@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { AdminUserRead, UserRole } from "./types";
+import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo } from "./types";
 
 export async function getAdminUsers(): Promise<AdminUserRead[]> {
   return apiRequest<AdminUserRead[]>("/admin/users");
@@ -28,5 +28,38 @@ export async function resetAdminUserPassword(
     `/admin/users/${userId}/reset-password`,
     { method: "POST" },
   );
+}
+
+export interface UserStats {
+  total: number;
+  active: number;
+  pending: number;
+  blocked: number;
+}
+
+export async function getUserStats(): Promise<UserStats> {
+  const users = await getAdminUsers();
+  return {
+    total: users.length,
+    active: users.filter((u) => !u.is_blocked).length,
+    pending: users.filter((u) => u.is_pending).length,
+    blocked: users.filter((u) => u.is_blocked).length,
+  };
+}
+
+export async function getSystemMetrics(): Promise<SystemMetrics> {
+  return apiRequest<SystemMetrics>("/admin/system-metrics");
+}
+
+export async function getServiceStatus(): Promise<ServiceStatus> {
+  return apiRequest<ServiceStatus>("/admin/service-status");
+}
+
+export async function getBackups(): Promise<BackupInfo> {
+  return apiRequest<BackupInfo>("/admin/backups");
+}
+
+export async function createBackup(): Promise<{ success: boolean; file: string; message: string }> {
+  return apiRequest<{ success: boolean; file: string; message: string }>("/admin/backups/create", { method: "POST" });
 }
 

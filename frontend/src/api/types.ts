@@ -25,7 +25,29 @@ export interface AdminUserRead {
   group_name: string | null;
   student_id: string | null;
   is_blocked: boolean;
+  is_pending?: boolean;
   created_at: string;
+}
+
+export interface SystemMetrics {
+  cpu_percent: number;
+  memory_percent: number;
+  memory_used_gb: number;
+  memory_total_gb: number;
+  disk_percent: number;
+  disk_used_gb: number;
+  disk_total_gb: number;
+}
+
+export interface ServiceStatus {
+  git: boolean;
+  db: boolean;
+  api: boolean;
+}
+
+export interface BackupInfo {
+  last_backup: string | null;
+  next_backup: string | null;
 }
 
 export interface Course {

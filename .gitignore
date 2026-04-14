@@ -10,11 +10,19 @@
 # IDE
 .idea/
 .vscode/
+.windsurf/
+.codeium/
 *.swp
 *.swo
 *~
 .DS_Store
 Thumbs.db
+
+# Local environment configs
+.envrc
+.env.local.*
+*.local.js
+*.local.ts
 
 # OS files
 .DS_Store

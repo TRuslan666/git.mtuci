@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { register, registerStudentMtuci } from "../api/authApi";
 import type { FormEvent } from "react";
 
@@ -8,10 +9,12 @@ export default function RegisterPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [useMtuci, setUseMtuci] = useState(false);
   const [mtuciLogin, setMtuciLogin] = useState("");
   const [mtuciPassword, setMtuciPassword] = useState("");
+  const [showMtuciPassword, setShowMtuciPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,18 +62,29 @@ export default function RegisterPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
-            <input
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              minLength={8}
-            />
+            <div className="relative">
+              <input
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 pr-10 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                minLength={8}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             <div className="mt-1.5 flex items-center gap-2 text-xs">
+              <span className={`inline-block w-2 h-2 rounded-full ${password.length >= 8 ? "bg-green-500" : "bg-gray-300"}`} />
               <span className={password.length >= 8 ? "text-green-600" : "text-gray-500"}>
-                {password.length >= 8 ? "✓" : "•"} Минимум 8 символов
+                Минимум 8 символов
               </span>
             </div>
           </div>
@@ -107,14 +121,24 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Пароль ЛК МТУСИ</label>
-                <input
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                  type="password"
-                  value={mtuciPassword}
-                  onChange={(e) => setMtuciPassword(e.target.value)}
-                  required={useMtuci}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 pr-10 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    type={showMtuciPassword ? "text" : "password"}
+                    value={mtuciPassword}
+                    onChange={(e) => setMtuciPassword(e.target.value)}
+                    required={useMtuci}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowMtuciPassword(!showMtuciPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showMtuciPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </>
           ) : (

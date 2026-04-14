@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -21,7 +21,8 @@ import {
   GitPullRequest,
 } from "lucide-react";
 import type { AdminUserRead } from "../api/types";
-import { getAdminUsers } from "../api/adminApi";
+import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBackup } from "../api/adminApi";
+import type { SystemMetrics, ServiceStatus, BackupInfo } from "../api/types";
 
 const mockRepositories = [
   { id: "1", name: "algorithms-course", author: "Иван Петров", commits: 24, isPublic: true, initials: "ИП", color: "bg-blue-500/20 text-blue-400" },
@@ -30,6 +31,13 @@ const mockRepositories = [
   { id: "4", name: "ml-research", author: "Ольга Новикова", commits: 12, isPublic: false, initials: "ОН", color: "bg-orange-500/20 text-orange-400" },
   { id: "5", name: "frontend-course", author: "Дмитрий Смирнов", commits: 45, isPublic: true, initials: "ДС", color: "bg-pink-500/20 text-pink-400" },
 ];
+
+interface Stats {
+  total: number;
+  active: number;
+  pending: number;
+  blocked: number;
+}
 
 interface StatCardProps {
   title: string;
@@ -76,27 +84,99 @@ function getStatusBadge(status: string) {
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<AdminUserRead[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, active: 0, pending: 0, blocked: 0 });
+  const [systemStatus, setSystemStatus] = useState<{ api: "online" | "offline"; db: "online" | "offline" }>({ api: "offline", db: "offline" });
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
+  const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const list = await getAdminUsers();
-        setUsers(list.slice(0, 5));
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [list, sysMetrics, svcStatus, backups] = await Promise.all([
+        getAdminUsers(),
+        getSystemMetrics().catch(() => null),
+        getServiceStatus().catch(() => null),
+        getBackups().catch(() => null),
+      ]);
+      setUsers(list);
+      setStats({
+        total: list.length,
+        active: list.filter((u) => !u.is_blocked).length,
+        pending: list.filter((u) => u.is_pending).length,
+        blocked: list.filter((u) => u.is_blocked).length,
+      });
+      setMetrics(sysMetrics);
+      setServiceStatus(svcStatus);
+      setBackupInfo(backups);
+      setSystemStatus({
+        api: svcStatus?.api ? "online" : "offline",
+        db: svcStatus?.db ? "online" : "offline",
+      });
+    } catch {
+      setSystemStatus({ api: "offline", db: "offline" });
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
 
-  const stats = [
-    { title: "Всего пользователей", value: "1,248", trend: "+14 за неделю", trendUp: true, icon: Users },
-    { title: "Репозиториев", value: "856", trend: "+32 за неделю", trendUp: true, icon: GitBranch },
-    { title: "Активность", value: "94%", trend: "+5% за неделю", trendUp: true, icon: TrendingUp },
-    { title: "Среднее время", value: "2.4ч", trend: "-12 мин", trendUp: true, icon: Clock },
+  const handleCreateBackup = useCallback(async () => {
+    setBackupLoading(true);
+    try {
+      await createBackup();
+      // Refresh backup info
+      const backups = await getBackups();
+      setBackupInfo(backups);
+      alert("Бэкап успешно создан!");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Ошибка создания бэкапа");
+    } finally {
+      setBackupLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Calculate weekly trends (compare current week vs previous week)
+  const now = new Date();
+  const oneWeekAgo = new Date(now);
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const twoWeeksAgo = new Date(now);
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+  const isInRange = (date: string, start: Date, end: Date) => {
+    const d = new Date(date);
+    return d >= start && d < end;
+  };
+
+  // Current week (last 7 days)
+  const currentNew = users.filter((u) => isInRange(u.created_at, oneWeekAgo, now)).length;
+  const currentActive = users.filter((u) => !u.is_blocked && isInRange(u.created_at, oneWeekAgo, now)).length;
+  const currentPending = users.filter((u) => u.is_pending && isInRange(u.created_at, oneWeekAgo, now)).length;
+  const currentBlocked = users.filter((u) => u.is_blocked && isInRange(u.created_at, oneWeekAgo, now)).length;
+
+  // Previous week (7-14 days ago)
+  const prevNew = users.filter((u) => isInRange(u.created_at, twoWeeksAgo, oneWeekAgo)).length;
+  const prevActive = users.filter((u) => !u.is_blocked && isInRange(u.created_at, twoWeeksAgo, oneWeekAgo)).length;
+  const prevPending = users.filter((u) => u.is_pending && isInRange(u.created_at, twoWeeksAgo, oneWeekAgo)).length;
+  const prevBlocked = users.filter((u) => u.is_blocked && isInRange(u.created_at, twoWeeksAgo, oneWeekAgo)).length;
+
+  const formatTrend = (current: number, previous: number) => {
+    const diff = current - previous;
+    const sign = diff >= 0 ? "+" : "";
+    return `${sign}${diff} за неделю`;
+  };
+
+  const statCards = [
+    { title: "Всего пользователей", value: stats.total.toLocaleString(), trend: formatTrend(currentNew, prevNew), trendUp: currentNew >= prevNew, icon: Users },
+    { title: "Активных", value: stats.active.toLocaleString(), trend: formatTrend(currentActive, prevActive), trendUp: currentActive >= prevActive, icon: GitBranch },
+    { title: "Ожидают", value: stats.pending.toLocaleString(), trend: formatTrend(currentPending, prevPending), trendUp: currentPending >= prevPending, icon: TrendingUp },
+    { title: "Заблокировано", value: stats.blocked.toLocaleString(), trend: formatTrend(currentBlocked, prevBlocked), trendUp: currentBlocked >= prevBlocked, icon: Clock },
   ];
 
   return (
@@ -106,7 +186,9 @@ export default function AdminPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a1a1a] transition-colors dark:text-white">Панель администратора</h1>
-            <p className="mt-1 text-sm text-gray-500 transition-colors dark:text-gray-400">Platform v1.0</p>
+            <p className="mt-1 text-sm text-gray-500 transition-colors dark:text-gray-400">
+              API: <span className={systemStatus.api === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.api === "online" ? "Online" : "Offline"} | DB: <span className={systemStatus.db === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.db === "online" ? "Online" : "Offline"}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -128,7 +210,7 @@ export default function AdminPage() {
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-          {stats.map((stat) => (
+          {statCards.map((stat) => (
             <StatCard key={stat.title} {...stat} />
           ))}
         </div>
@@ -310,10 +392,10 @@ export default function AdminPage() {
             <div className="p-5">
               {/* Progress bars */}
               <div className="space-y-4 mb-6">
-                {[
-                  { label: "CPU", value: 42, color: "bg-blue-500" },
-                  { label: "RAM", value: 61, color: "bg-green-500" },
-                  { label: "Диск", value: 87, color: "bg-red-500" },
+                {metrics ? [
+                  { label: "CPU", value: Math.round(metrics.cpu_percent), color: "bg-blue-500" },
+                  { label: "RAM", value: Math.round(metrics.memory_percent), color: "bg-green-500" },
+                  { label: "Диск", value: Math.round(metrics.disk_percent), color: "bg-red-500" },
                 ].map((metric) => (
                   <div key={metric.label}>
                     <div className="flex items-center justify-between mb-1">
@@ -324,15 +406,17 @@ export default function AdminPage() {
                       <div className={`h-full rounded-full ${metric.color} ${metric.value > 80 ? "brightness-110" : ""}`} style={{ width: `${metric.value}%` }} />
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-sm text-gray-500">Загрузка метрик...</div>
+                )}
               </div>
 
               {/* Service status */}
               <div className="space-y-3 mb-6">
                 {[
-                  { icon: GitBranch, label: "Git сервис", status: "OK", statusColor: "text-green-600 dark:text-green-400" },
-                  { icon: Database, label: "БД (PostgreSQL)", status: "OK", statusColor: "text-green-600 dark:text-green-400" },
-                  { icon: Mail, label: "Почтовый сервер", status: "Задержка", statusColor: "text-yellow-600 dark:text-yellow-400" },
+                  { icon: GitBranch, label: "Git сервис", status: serviceStatus?.git ? "Online" : "Offline", statusColor: serviceStatus?.git ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400" },
+                  { icon: Database, label: "БД (PostgreSQL)", status: serviceStatus?.db ? "Online" : "Offline", statusColor: serviceStatus?.db ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400" },
+                  { icon: Mail, label: "API", status: serviceStatus?.api ? "Online" : "Offline", statusColor: serviceStatus?.api ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400" },
                 ].map((svc) => (
                   <div key={svc.label} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -340,7 +424,7 @@ export default function AdminPage() {
                       <span className="text-sm text-gray-700 dark:text-gray-300">{svc.label}</span>
                     </div>
                     <span className={`flex items-center gap-1 text-xs font-medium ${svc.statusColor}`}>
-                      {svc.status === "OK" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                      {svc.status === "Online" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
                       {svc.status}
                     </span>
                   </div>
@@ -350,7 +434,9 @@ export default function AdminPage() {
                     <Cloud className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     <span className="text-sm text-gray-700 dark:text-gray-300">Бэкап</span>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-500">Вчера 03:00</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">
+                    {backupInfo?.last_backup || "Нет данных"}
+                  </span>
                 </div>
               </div>
 
@@ -358,17 +444,21 @@ export default function AdminPage() {
               <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-[#2d2d2d]">
                 <button
                   type="button"
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-[#2d2d2d] dark:border-[#3d3d3d] dark:text-gray-300 dark:hover:bg-[#3d3d3d]"
+                  onClick={load}
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-[#2d2d2d] dark:border-[#3d3d3d] dark:text-gray-300 dark:hover:bg-[#3d3d3d] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <RotateCcw className="h-4 w-4" />
-                  Перезапустить
+                  <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  {loading ? "Обновление..." : "Обновить данные"}
                 </button>
                 <button
                   type="button"
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                  onClick={handleCreateBackup}
+                  disabled={backupLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Database className="h-4 w-4" />
-                  Бэкап сейчас
+                  <Database className={`h-4 w-4 ${backupLoading ? "animate-pulse" : ""}`} />
+                  {backupLoading ? "Создание..." : "Бэкап сейчас"}
                 </button>
               </div>
             </div>
