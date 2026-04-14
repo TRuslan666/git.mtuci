@@ -23,6 +23,7 @@ import {
 import type { AdminUserRead } from "../api/types";
 import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBackup } from "../api/adminApi";
 import type { SystemMetrics, ServiceStatus, BackupInfo } from "../api/types";
+import toast from "react-hot-toast";
 
 const mockRepositories = [
   { id: "1", name: "algorithms-course", author: "Иван Петров", commits: 24, isPublic: true, initials: "ИП", color: "bg-blue-500/20 text-blue-400" },
@@ -130,9 +131,9 @@ export default function AdminPage() {
       // Refresh backup info
       const backups = await getBackups();
       setBackupInfo(backups);
-      alert("Бэкап успешно создан!");
+      toast.success("Бэкап успешно создан!");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка создания бэкапа");
+      toast.error(err instanceof Error ? err.message : "Ошибка создания бэкапа");
     } finally {
       setBackupLoading(false);
     }

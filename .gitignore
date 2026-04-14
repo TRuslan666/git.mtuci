@@ -213,3 +213,5 @@ TODO.md
 *.pid
 *.seed
 *.pid.lock
+
+backups

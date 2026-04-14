@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useLocation } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import AuthRequired from "./components/AuthRequired";
 import AdminRequired from "./components/AdminRequired";
 import NavBar from "./components/NavBar";
@@ -84,6 +85,31 @@ export default function App() {
           {!isAuthPage ? <Footer /> : null}
         </div>
       </div>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#1e1e1e",
+            color: "#ffffff",
+            border: "1px solid #2d2d2d",
+            padding: "12px 16px",
+            borderRadius: "8px",
+          },
+          success: {
+            iconTheme: {
+              primary: "#10b981",
+              secondary: "#1e1e1e",
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: "#ef4444",
+              secondary: "#1e1e1e",
+            },
+          },
+        }}
+      />
     </div>
   );
 }
