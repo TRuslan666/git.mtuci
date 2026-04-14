@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { login } from "../api/authApi";
 
 export default function LoginPage() {
@@ -8,6 +9,8 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,7 +19,13 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('remember_me', 'true');
+      } else {
+        localStorage.removeItem('remember_me');
+      }
       navigate("/home", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -49,15 +58,38 @@ export default function LoginPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
-            <input
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-            <div className="mt-1 flex justify-end">
+            <div className="relative">
+              <input
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 pr-10 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+            <div className="mt-1 flex justify-between items-center">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                Запомнить меня
+              </label>
               <Link
                 to="/forgot-password"
                 className="text-sm text-purple-600 transition hover:text-purple-800 hover:underline"

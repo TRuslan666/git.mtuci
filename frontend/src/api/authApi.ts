@@ -12,11 +12,11 @@ export function invalidateMeCache() {
   meInFlight = null;
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, rememberMe?: boolean) {
   const data = await apiRequest<TokenResponse>("/auth/login", {
     method: "POST",
     auth: false,
-    body: { email, password },
+    body: { email, password, remember_me: rememberMe },
   });
 
   // В backend response_model: TokenResponse(access_token, token_type)

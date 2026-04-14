@@ -188,7 +188,11 @@ async def login(
         )
 
     # JWT будет содержать `sub` = id пользователя (это используется в `/auth/me`)
-    access_token = create_access_token(str(user_obj.id))
+    # Если remember_me=True, токен живет 30 дней, иначе 1 день
+    access_token = create_access_token(
+        str(user_obj.id),
+        expires_days=30 if payload.remember_me else 1
+    )
     return TokenResponse(access_token=access_token)
 
 

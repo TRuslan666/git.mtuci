@@ -21,6 +21,7 @@ class StudentRegisterRequest(BaseModel):
 class AuthLoginRequest(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False
 
 
 class TokenResponse(BaseModel):

@@ -45,8 +45,11 @@ def verify_password(password: str, password_hash: str) -> bool:
     )
 
 
-def create_access_token(subject: str, *, extra_claims: dict[str, Any] | None = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_access_token(subject: str, *, extra_claims: dict[str, Any] | None = None, expires_days: int | None = None) -> str:
+    if expires_days:
+        expire = datetime.now(timezone.utc) + timedelta(days=expires_days)
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode: dict[str, Any] = {"sub": subject, "exp": expire}
     if extra_claims:
         to_encode.update(extra_claims)
