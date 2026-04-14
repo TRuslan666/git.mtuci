@@ -121,24 +121,26 @@ export default function NavBar() {
 
         {/* Right: Navigation + User */}
         <div className="flex items-center gap-4">
-          <nav className="flex items-center gap-2">
-            <Link
-              to="/courses"
-              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
-            >
-              {/* ЗАМЕНИ src НА ИКОНКУ КУРСОВ */}
-              <img src="/icon-courses.png" alt="" className="h-5 w-5" />
-              Курсы
-            </Link>
-            <Link
-              to="/dashboard"
-              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
-            >
-              {/* ЗАМЕНИ src НА ИКОНКУ ДАШБОРДА */}
-              <img src="/icon-dashboard.png" alt="" className="h-5 w-5" />
-              Дашборд
-            </Link>
-          </nav>
+          {userRole !== "admin" && (
+            <nav className="flex items-center gap-2">
+              <Link
+                to="/courses"
+                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
+              >
+                {/* ЗАМЕНИ src НА ИКОНКУ КУРСОВ */}
+                <img src="/icon-courses.png" alt="" className="h-5 w-5" />
+                Курсы
+              </Link>
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
+              >
+                {/* ЗАМЕНИ src НА ИКОНКУ ДАШБОРДА */}
+                <img src="/icon-dashboard.png" alt="" className="h-5 w-5" />
+                Дашборд
+              </Link>
+            </nav>
+          )}
 
           {/* Theme toggle */}
           <button

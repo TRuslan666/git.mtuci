@@ -3,9 +3,9 @@ export default function Footer() {
   const version = "v1.2.0"; // TODO: получать из конфига
 
   return (
-    <footer className="border-t border-[#d4cfe6] bg-white">
+    <footer className="border-t border-[#d4cfe6] bg-white transition-colors dark:bg-[#1c1c1e] dark:border-[#2d2d2d]">
       <div className="mx-auto max-w-6xl px-4 py-2">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 text-sm text-gray-600">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 text-sm text-gray-600 dark:text-gray-400">
           {/* Левая колонка (под лого) */}
           <div className="flex items-center gap-4">
             <a
@@ -16,15 +16,15 @@ export default function Footer() {
             >
               MTUCI.ru
             </a>
-            <span className="text-gray-300">|</span>
-            <button className="text-gray-600 hover:text-gray-900">
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
               Сообщить об ошибке
             </button>
           </div>
 
           {/* Центральная колонка */}
           <div className="flex items-center justify-center gap-4">
-            <button className="text-gray-600 hover:text-gray-900">
+            <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
               Шпаргалка по Git
             </button>
             <button className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-white transition hover:bg-gray-800">
@@ -36,9 +36,9 @@ export default function Footer() {
           </div>
 
           {/* Правая колонка (прижата к правому краю) */}
-          <div className="flex items-center justify-end gap-3 text-xs text-gray-500">
+          <div className="flex items-center justify-end gap-3 text-xs text-gray-500 dark:text-gray-500">
             <span>{commitCount} коммитов</span>
-            <span className="text-gray-300">•</span>
+            <span className="text-gray-300 dark:text-gray-600">•</span>
             <span>{version}</span>
           </div>
         </div>
