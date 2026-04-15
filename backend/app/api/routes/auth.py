@@ -119,8 +119,9 @@ async def register_student_mtuci(
         role=UserRole.student,
         group_name=group_name,
         student_id=student_id,
-        mtuci_login=payload.mtuci_login if mtuci_info else None,
-        mtuci_password=payload.mtuci_password if mtuci_info else None,
+        mtuci_login=payload.mtuci_login if payload.mtuci_login else None,
+        mtuci_password=payload.mtuci_password if payload.mtuci_password else None,
+        is_pending=False,  # Авто-аппрув через ЛК МТУСИ
     )
     session.add(user)
     await session.commit()

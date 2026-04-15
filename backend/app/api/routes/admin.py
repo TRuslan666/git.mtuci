@@ -10,6 +10,7 @@ import httpx
 import psutil
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -85,9 +86,30 @@ async def admin_patch_user(
         user_id=user_id,
         role=payload.role,
         is_blocked=payload.is_blocked,
+        is_pending=payload.is_pending,
         group_name=payload.group_name,
         student_id=payload.student_id,
     )
+    return AdminUserRead.model_validate(user)
+
+
+@router.post("/users/{user_id}/approve", response_model=AdminUserRead)
+async def admin_approve_user(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRead:
+    """Approve pending user (admin only)."""
+    _require_admin(current_user)
+    
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    user.is_pending = False
+    await session.commit()
+    await session.refresh(user)
     return AdminUserRead.model_validate(user)
 
 

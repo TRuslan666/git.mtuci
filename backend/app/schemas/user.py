@@ -39,14 +39,16 @@ class AdminUserRead(BaseModel):
     full_name: str
     role: UserRole
     group_name: str | None = None
-    student_id: str | None = None
     is_blocked: bool
-    created_at: datetime
+    is_pending: bool
+    group_name: str | None
+    student_id: str | None = None
 
 
 class AdminUpdateUserRequest(BaseModel):
     role: UserRole
     is_blocked: bool
+    is_pending: bool = True
     group_name: str | None = None
     student_id: str | None = None
 
