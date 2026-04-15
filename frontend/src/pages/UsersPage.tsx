@@ -78,9 +78,6 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [totalUsers, setTotalUsers] = useState(0);
 
-
-
-
 useEffect(() => {
   const fetchUsers = async () => {
     try {
