@@ -17,6 +17,8 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { useEffect } from "react";
+import { getAdminUsers } from "../api/adminApi";
 
 interface User {
   id: string;
@@ -30,15 +32,6 @@ interface User {
   repos: number;
   lastLogin: string;
 }
-
-const mockUsers: User[] = [
-  { id: "1", name: "Петров И.А.", email: "petrov@mtuci.ru", initials: "ПИ", color: "bg-blue-500", group: "ИСТ-21", role: "student", status: "active", repos: 7, lastLogin: "Сегодня" },
-  { id: "2", name: "Орлова В.С.", email: "orlova@mtuci.ru", initials: "ОВ", color: "bg-purple-500", group: "ИСТ-21", role: "teacher", status: "active", repos: 12, lastLogin: "Вчера" },
-  { id: "3", name: "Кузнецов Д.М.", email: "kuznetsov@mtuci.ru", initials: "КД", color: "bg-green-500", group: "ПИ-22", role: "student", status: "pending", repos: 3, lastLogin: "Никогда" },
-  { id: "4", name: "Смирнова Е.К.", email: "smirnova@mtuci.ru", initials: "СЕ", color: "bg-orange-500", group: "ИСТ-20", role: "student", status: "active", repos: 15, lastLogin: "3 дня назад" },
-  { id: "5", name: "Админ А.А.", email: "admin@mtuci.ru", initials: "АА", color: "bg-yellow-500", group: "—", role: "admin", status: "active", repos: 42, lastLogin: "Сегодня" },
-  { id: "6", name: "Васильев Н.П.", email: "vasiliev@mtuci.ru", initials: "ВН", color: "bg-pink-500", group: "ИВТ-21", role: "student", status: "blocked", repos: 0, lastLogin: "2 месяца назад" },
-];
 
 function getRoleBadge(role: User["role"]) {
   const styles = {
@@ -80,20 +73,85 @@ export default function UsersPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalUsers, setTotalUsers] = useState(0);
 
-  const totalUsers = 1248;
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await getAdminUsers();
+      setUsers(
+        res.map((u) => ({
+          id: u.id,
+          name: u.full_name,
+          email: u.email,
+          group: u.group_name || "—",
+          role: u.role,
+
+          status: u.is_blocked
+            ? "blocked"
+            : u.is_pending
+            ? "pending"
+            : "active",
+
+          repos: 0,
+          lastLogin: new Date(u.created_at).toLocaleDateString(),
+
+          initials: u.full_name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase(),
+
+          color: "bg-blue-500",
+        }))
+      );
+
+      setTotalUsers(res.length);
+
+    } catch {
+      setError("Ошибка загрузки пользователей");
+    } finally {
+      setLoading(false);
+    }
+  };
+    fetchUsers();
+  }, []);
+
+
+
   const stats = [
-    { label: "Всего", value: 1248, color: "text-white" },
-    { label: "Активных", value: 1189, color: "text-white" },
-    { label: "Ожидают", value: 47, color: "text-white" },
-    { label: "Заблокировано", value: 12, color: "text-red-400" },
+    {
+      label: "Всего",
+      value: totalUsers,
+      color: "text-white",
+    },
+    {
+      label: "Активных",
+      value: users.filter(u => u.status === "active").length,
+      color: "text-white",
+    },
+    {
+      label: "Ожидают",
+      value: users.filter(u => u.status === "pending").length,
+      color: "text-white",
+    },
+    {
+      label: "Заблокировано",
+      value: users.filter(u => u.status === "blocked").length,
+      color: "text-red-400",
+    },
   ];
 
   const toggleSelectAll = () => {
-    if (selectedUsers.length === mockUsers.length) {
+    if (selectedUsers.length === users.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(mockUsers.map((u) => u.id));
+      setSelectedUsers(users.map((u) => u.id));
     }
   };
 
@@ -114,7 +172,7 @@ export default function UsersPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Все пользователи</h1>
-            <span className="text-sm text-gray-500">1248 записей</span>
+            <span className="text-sm text-gray-500">{totalUsers} записей</span>
           </div>
           <div className="flex items-center gap-2">
             <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d] text-sm text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors shadow-sm">
@@ -176,6 +234,16 @@ export default function UsersPage() {
         </div>
 
         {/* Users Table */}
+        {loading && (
+          <div className="flex justify-center py-10">
+            <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] overflow-hidden shadow-sm">
           <table className="w-full">
             <thead>
@@ -183,7 +251,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={selectedUsers.length === mockUsers.length && mockUsers.length > 0}
+                    checked={selectedUsers.length === users.length && users.length > 0}
                     onChange={toggleSelectAll}
                     className="rounded border-[#d4cfe6] dark:border-[#2d2d2d] bg-white dark:bg-[#252525] text-blue-600 focus:ring-0"
                   />
@@ -198,7 +266,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {mockUsers.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="border-b border-[#d4cfe6] dark:border-[#2d2d2d] last:border-b-0 hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors">
                   <td className="px-4 py-3">
                     <input
@@ -258,7 +326,7 @@ export default function UsersPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">
-              Показано {mockUsers.length} из {totalUsers}
+              Показано {users.length} из {totalUsers}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500">На странице:</span>
