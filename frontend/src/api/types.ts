@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin";
+export type UserRole = "student" | "teacher" | "admin" | "laborant";
 
 export type TokenType = "bearer";
 
@@ -15,6 +15,7 @@ export interface UserRead {
   avatar_url: string | null;
   avatar_display_mode: "cover" | "contain" | "fill" | "scale-down";
   created_at: string;
+  last_login: string | null;
 }
 
 export interface AdminUserRead {
@@ -27,6 +28,7 @@ export interface AdminUserRead {
   is_blocked: boolean;
   is_pending?: boolean;
   created_at: string;
+  last_login: string | null;
 }
 
 export interface SystemMetrics {

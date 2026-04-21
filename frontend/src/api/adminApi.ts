@@ -7,11 +7,17 @@ export async function getAdminUsers(): Promise<AdminUserRead[]> {
 
 export async function patchAdminUser(
   userId: string,
-  payload: { role: UserRole; is_blocked: boolean; group_name?: string | null; student_id?: string | null },
+  payload: { role: UserRole; is_blocked: boolean; is_pending?: boolean; group_name?: string | null; student_id?: string | null },
 ): Promise<AdminUserRead> {
   return apiRequest<AdminUserRead>(`/admin/users/${userId}`, {
     method: "PATCH",
     body: payload,
+  });
+}
+
+export async function approveUser(userId: string): Promise<AdminUserRead> {
+  return apiRequest<AdminUserRead>(`/admin/users/${userId}/approve`, {
+    method: "POST",
   });
 }
 
@@ -86,5 +92,9 @@ export interface ActiveRepositoryStat {
 
 export async function getActiveRepositories(limit: number = 5): Promise<ActiveRepositoryStat[]> {
   return apiRequest<ActiveRepositoryStat[]>(`/stats/active-repositories?limit=${limit}`);
+}
+
+export async function getGroups(): Promise<string[]> {
+  return apiRequest<string[]>("/groups");
 }
 

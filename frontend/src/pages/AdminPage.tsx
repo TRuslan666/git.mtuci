@@ -394,10 +394,14 @@ export default function AdminPage() {
                         </td>
                         <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300 first:rounded-l-lg last:rounded-r-lg">{user.group_name || "—"}</td>
                         <td className="py-3 pr-8 first:rounded-l-lg last:rounded-r-lg">
-                          <span className="text-sm capitalize text-gray-600 dark:text-gray-300">{user.role}</span>
+                          <span className="text-sm capitalize text-gray-600 dark:text-gray-300">
+                            {user.role === "admin" ? "Админ" : user.role === "teacher" ? "Препод" : user.role === "laborant" ? "Лаборант" : "Студент"}
+                          </span>
                         </td>
                         <td className="py-3 pr-8 text-sm text-gray-600 dark:text-gray-300 first:rounded-l-lg last:rounded-r-lg">
-                          {new Date(user.created_at).toLocaleDateString("ru-RU")}
+                          {user.created_at && !isNaN(new Date(user.created_at).getTime())
+                            ? new Date(user.created_at).toLocaleDateString("ru-RU")
+                            : "—"}
                         </td>
                         <td className="py-3 text-left first:rounded-l-lg last:rounded-r-lg">
                           {getStatusBadge(user.is_blocked ? "blocked" : "active")}

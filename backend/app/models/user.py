@@ -16,6 +16,7 @@ class UserRole(str, Enum):
     student = "student"
     teacher = "teacher"
     admin = "admin"
+    laborant = "laborant"
 
 
 class AvatarDisplayMode(str, Enum):
@@ -57,4 +58,9 @@ class User(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+    last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
     )

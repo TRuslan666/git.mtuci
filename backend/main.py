@@ -88,6 +88,7 @@ async def create_super_admin_if_missing() -> None:
                     full_name="Super Admin",
                     role=UserRole.admin,
                     is_blocked=False,
+                    is_pending=False,
                 )
                 session.add(existing)
                 await session.commit()
@@ -96,6 +97,7 @@ async def create_super_admin_if_missing() -> None:
                 # На случай, если пользователь уже существует, гарантируем права супер-админа.
                 existing.role = UserRole.admin
                 existing.is_blocked = False
+                existing.is_pending = False
                 session.add(existing)
                 await session.commit()
     except Exception as e:

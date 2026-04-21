@@ -20,6 +20,7 @@ class UserRead(BaseModel):
     avatar_url: str | None = None
     avatar_display_mode: str = "cover"
     created_at: datetime
+    last_login: datetime | None = None
 
 
 class StudentUserRead(BaseModel):
@@ -38,11 +39,12 @@ class AdminUserRead(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
-    group_name: str | None = None
     is_blocked: bool
     is_pending: bool
-    group_name: str | None
+    group_name: str | None = None
     student_id: str | None = None
+    created_at: datetime
+    last_login: datetime | None = None
 
 
 class AdminUpdateUserRequest(BaseModel):

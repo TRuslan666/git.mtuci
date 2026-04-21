@@ -58,6 +58,18 @@ def _require_admin(current_user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
 
+def _check_not_self(current_user: User, target_user_id: UUID) -> None:
+    """Prevent admin from modifying themselves."""
+    if current_user.id == target_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot perform this action on yourself")
+
+
+def _check_target_not_admin(target_user: User) -> None:
+    """Prevent actions on other admin users."""
+    if target_user.role == UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot perform this action on admin users")
+
+
 def _generate_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
@@ -77,10 +89,19 @@ async def admin_get_users(
 async def admin_patch_user(
     user_id: UUID,
     payload: AdminUpdateUserRequest,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
     _require_admin(current_user)
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
+
     user = await update_user_role_and_block(
         session,
         user_id=user_id,
@@ -101,12 +122,14 @@ async def admin_approve_user(
 ) -> AdminUserRead:
     """Approve pending user (admin only)."""
     _require_admin(current_user)
-    
+    _check_not_self(current_user, user_id)
+
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
+    _check_target_not_admin(user)
+
     user.is_pending = False
     await session.commit()
     await session.refresh(user)
@@ -116,14 +139,20 @@ async def admin_approve_user(
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete_user(
     user_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     _require_admin(current_user)
-    try:
-        await delete_user_by_id(session, user_id)
-    except ValueError:
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
+
+    await delete_user_by_id(session, user_id)
 
     # Важно: явно возвращаем Response, чтобы FastAPI не пытался сериализовать body.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -133,10 +162,18 @@ async def admin_delete_user(
 async def admin_reset_password(
     user_id: UUID,
     payload: AdminResetPasswordRequest | None = Body(None),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminResetPasswordResponse:
     _require_admin(current_user)
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
 
     if payload and payload.new_password:
         new_password = payload.new_password

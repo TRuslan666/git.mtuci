@@ -188,6 +188,11 @@ async def login(
             detail="User is blocked",
         )
 
+    # Update last login time
+    from datetime import datetime, timezone
+    user_obj.last_login = datetime.now(timezone.utc)
+    await session.commit()
+
     # JWT будет содержать `sub` = id пользователя (это используется в `/auth/me`)
     # Если remember_me=True, токен живет 30 дней, иначе 1 день
     access_token = create_access_token(
