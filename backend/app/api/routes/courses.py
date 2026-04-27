@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.core.permissions import require_permission
 from app.models.assignment import Assignment
 from app.models.course import Course
 from app.models.course_enrollment import CourseEnrollment
@@ -149,6 +150,7 @@ async def _get_repo_name_for_requester(
 
 
 @router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
+@require_permission("assignment_create")
 async def create_course_endpoint(
     payload: CourseCreateRequest,
     session: AsyncSession = Depends(get_session),
@@ -193,6 +195,7 @@ async def list_courses_endpoint(
 
 
 @router.delete("/courses/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("assignment_delete")
 async def delete_course_endpoint(
     course_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -218,6 +221,7 @@ async def delete_course_endpoint(
     response_model=CourseEnrollmentRead,
     status_code=status.HTTP_201_CREATED,
 )
+@require_permission("group_manage")
 async def enroll_student_endpoint(
     course_id: UUID,
     student_id: UUID,
@@ -258,6 +262,12 @@ async def create_assignment_endpoint(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user),
 ):
+    # Check permission inline (decorator breaks UploadFile typing)
+    from app.core.permissions import get_user_permissions
+    user_perms = await get_user_permissions(current_user, session)
+    if "assignment_create" not in user_perms:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied: assignment_create required")
+    
     if current_user.role != UserRole.teacher:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access only")
 
@@ -369,6 +379,7 @@ async def list_assignments_endpoint(
     "/courses/{course_id}/assignments/{assignment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@require_permission("assignment_delete")
 async def delete_assignment_endpoint(
     course_id: UUID,
     assignment_id: UUID,
@@ -565,6 +576,7 @@ async def list_submissions_endpoint(
     "/courses/{course_id}/assignments/{assignment_id}/submissions/{student_id}/grade",
     response_model=AssignmentSubmissionStatusRead,
 )
+@require_permission("grade_edit")
 async def grade_submission_endpoint(
     course_id: UUID,
     assignment_id: UUID,

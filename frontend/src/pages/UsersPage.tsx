@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { getAdminUsers, patchAdminUser, approveUser, resetAdminUserPassword, getGroups } from "../api/adminApi";
 import { getMe } from "../api/authApi";
+import { usePermissions } from "../hooks/usePermissions";
 import type { AdminUserRead, UserRole, UserRead } from "../api/types";
 
 interface User {
@@ -76,7 +77,8 @@ function getStatusBadge(status: User["status"]) {
 export default function UsersPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const { hasPermission } = usePermissions();
 
   // Search with debounce
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,6 +127,23 @@ export default function UsersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<string[]>([]);
   const [showPerPageDropdown, setShowPerPageDropdown] = useState(false);
+
+  // Russian pluralization helper for records
+  const pluralizeRecords = (count: number): string => {
+    const lastDigit = count % 10;
+    const lastTwoDigits = count % 100;
+    
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+      return "записей";
+    }
+    if (lastDigit === 1) {
+      return "запись";
+    }
+    if (lastDigit >= 2 && lastTwoDigits <= 4) {
+      return "записи";
+    }
+    return "записей";
+  };
   const perPageRef = useRef<HTMLDivElement>(null);
 
   // Role filter
@@ -363,7 +382,7 @@ useEffect(() => {
     }
   };
 
-  const totalPages = Math.ceil(totalUsers / perPage);
+  const totalPages = Math.ceil(totalUsers / itemsPerPage);
 
   // Apply filters and search (cumulative)
   const filteredUsers = users.filter((user) => {
@@ -406,7 +425,9 @@ useEffect(() => {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Все пользователи</h1>
             <span className="text-sm text-gray-500">
-              {filteredUsers.length === totalUsers ? `${totalUsers} записей` : `Найдено ${filteredUsers.length} из ${totalUsers}`}
+              {filteredUsers.length === totalUsers 
+                ? `${totalUsers} ${pluralizeRecords(totalUsers)}` 
+                : `Найдено ${filteredUsers.length} из ${totalUsers}`}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -667,14 +688,16 @@ useEffect(() => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleEdit(user)}
-                        disabled={actionLoading || user.role === "admin"}
-                        title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
-                        className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
+                      {hasPermission("user_edit") && (
+                        <button
+                          onClick={() => handleEdit(user)}
+                          disabled={actionLoading || user.role === "admin"}
+                          title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
+                          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
                       {user.status === "blocked" ? (
                         <button
                           onClick={() => handleBlockToggle(user)}
@@ -737,7 +760,7 @@ useEffect(() => {
 
         {/* Pagination */}
         {(() => {
-          const totalPages = Math.ceil(totalUsers / perPage) || 1;
+          const totalPages = Math.ceil(totalUsers / itemsPerPage) || 1;
 
           // Generate page numbers to show
           const getPageNumbers = () => {
@@ -764,7 +787,7 @@ useEffect(() => {
                       onClick={() => setShowPerPageDropdown(!showPerPageDropdown)}
                       className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d] rounded-lg text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors shadow-sm"
                     >
-                      {perPage}
+                      {itemsPerPage}
                       <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showPerPageDropdown ? "rotate-180" : ""}`} />
                     </button>
                     {showPerPageDropdown && (
@@ -773,12 +796,12 @@ useEffect(() => {
                           <button
                             key={val}
                             onClick={() => {
-                              setPerPage(val);
+                              setItemsPerPage(val);
                               setCurrentPage(1);
                               setShowPerPageDropdown(false);
                             }}
                             className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
-                              perPage === val
+                              itemsPerPage === val
                                 ? "bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
                                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
                             }`}

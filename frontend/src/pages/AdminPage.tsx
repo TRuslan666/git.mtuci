@@ -28,6 +28,7 @@ import {
 import type { AdminUserRead } from "../api/types";
 import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBackup, getCommitsByFaculty, getActiveRepositories } from "../api/adminApi";
 import type { SystemMetrics, ServiceStatus, BackupInfo, FacultyCommitsStat, ActiveRepositoryStat } from "../api/types";
+import { usePermissions } from "../hooks/usePermissions";
 import toast from "react-hot-toast";
 
 interface Stats {
@@ -120,6 +121,8 @@ function getStatusBadge(status: string) {
 }
 
 export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const { hasPermission } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<AdminUserRead[]>([]);
@@ -433,10 +436,12 @@ export default function AdminPage() {
                 {showRepoDropdown && (
                   <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-md shadow-lg dark:bg-[#1e1e1e]/95 dark:border-[#2d2d2d]/50 z-50">
                     <div className="p-1.5 space-y-0.5">
-                      <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
-                        <Plus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        Создать репозиторий
-                      </button>
+                      {hasPermission("repo_create") && (
+                        <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
+                          <Plus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          Создать репозиторий
+                        </button>
+                      )}
                       <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100/80 rounded-lg transition-colors dark:text-gray-300 dark:hover:bg-[#2d2d2d]/80">
                         <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                         Поиск проекта

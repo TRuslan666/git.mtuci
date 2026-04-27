@@ -14,6 +14,7 @@ from uuid import UUID
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.core.permissions import require_permission
 from app.models.faculty import Faculty
 from app.models.repository import Repository
 from app.models.user import User, UserRole
@@ -40,6 +41,7 @@ FACULTY_COLORS = {
 
 
 @router.get("/commits-by-faculty", response_model=list[FacultyCommitsStat])
+@require_permission("logs_view")
 async def get_commits_by_faculty(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -123,6 +125,7 @@ async def get_commits_by_faculty(
 
 
 @router.get("/dashboard-summary")
+@require_permission("settings_view")
 async def get_dashboard_summary(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -181,6 +184,7 @@ def get_initials(full_name: str) -> str:
 
 
 @router.get("/active-repositories", response_model=list[ActiveRepositoryStat])
+@require_permission("logs_view")
 async def get_active_repositories(
     limit: int = 5,
     current_user: User = Depends(get_current_user),

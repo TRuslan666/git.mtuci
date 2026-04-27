@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.core.permissions import require_permission
 from app.models.user import User, UserRole
 from app.schemas.user import (
     AdminResetPasswordRequest,
@@ -76,23 +77,23 @@ def _generate_password(length: int = 12) -> str:
 
 
 @router.get("/users", response_model=list[AdminUserRead])
+@require_permission("user_view")
 async def admin_get_users(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[AdminUserRead]:
-    _require_admin(current_user)
     users = await get_all_users(session)
     return [AdminUserRead.model_validate(u) for u in users]
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserRead)
+@require_permission("user_edit")
 async def admin_patch_user(
     user_id: UUID,
     payload: AdminUpdateUserRequest,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
-    _require_admin(current_user)
     _check_not_self(current_user, user_id)
 
     # Fetch target user and check if admin
@@ -115,13 +116,13 @@ async def admin_patch_user(
 
 
 @router.post("/users/{user_id}/approve", response_model=AdminUserRead)
+@require_permission("user_edit")
 async def admin_approve_user(
     user_id: UUID,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
-    """Approve pending user (admin only)."""
-    _require_admin(current_user)
+    """Approve pending user."""
     _check_not_self(current_user, user_id)
 
     result = await session.execute(select(User).where(User.id == user_id))
@@ -137,12 +138,12 @@ async def admin_approve_user(
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("user_delete")
 async def admin_delete_user(
     user_id: UUID,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    _require_admin(current_user)
     _check_not_self(current_user, user_id)
 
     # Fetch target user and check if admin
@@ -159,13 +160,13 @@ async def admin_delete_user(
 
 
 @router.post("/users/{user_id}/reset-password", response_model=AdminResetPasswordResponse)
+@require_permission("user_edit")
 async def admin_reset_password(
     user_id: UUID,
     payload: AdminResetPasswordRequest | None = Body(None),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminResetPasswordResponse:
-    _require_admin(current_user)
     _check_not_self(current_user, user_id)
 
     # Fetch target user and check if admin
@@ -185,10 +186,10 @@ async def admin_reset_password(
 
 
 @router.get("/system-metrics", response_model=SystemMetrics)
+@require_permission("settings_view")
 async def admin_system_metrics(
     current_user=Depends(get_current_user),
 ) -> SystemMetrics:
-    _require_admin(current_user)
 
     # CPU
     cpu_percent = psutil.cpu_percent(interval=1)
@@ -217,10 +218,10 @@ async def admin_system_metrics(
 
 
 @router.get("/service-status", response_model=ServiceStatus)
+@require_permission("settings_view")
 async def admin_service_status(
     current_user=Depends(get_current_user),
 ) -> ServiceStatus:
-    _require_admin(current_user)
 
     # Check Git service (Gitea)
     git_status = False
@@ -243,10 +244,10 @@ async def admin_service_status(
 
 
 @router.get("/backups", response_model=BackupInfo)
+@require_permission("logs_view")
 async def admin_backups(
     current_user=Depends(get_current_user),
 ) -> BackupInfo:
-    _require_admin(current_user)
 
     # Check for backup files in /backups directory
     backup_dir = "/backups"
@@ -276,10 +277,10 @@ async def admin_backups(
 
 
 @router.post("/backups/create")
+@require_permission("settings_edit")
 async def admin_create_backup(
     current_user=Depends(get_current_user),
 ) -> dict:
-    _require_admin(current_user)
 
     import subprocess
     from datetime import datetime
