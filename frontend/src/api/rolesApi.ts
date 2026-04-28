@@ -71,3 +71,27 @@ export async function untrustLaborant(assistantId: string): Promise<{ success: b
 export async function getMyPermissions(): Promise<string[]> {
   return apiRequest<string[]>("/roles/my-permissions");
 }
+
+export interface AuditLog {
+  id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_role: string;
+  target_role: string;
+  action: string;
+  permission_id: string | null;
+  details: unknown;
+  created_at: string;
+}
+
+export async function getAuditLogs(
+  targetRole?: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<AuditLog[]> {
+  const params = new URLSearchParams();
+  if (targetRole) params.append("target_role", targetRole);
+  params.append("limit", limit.toString());
+  params.append("offset", offset.toString());
+  return apiRequest<AuditLog[]>(`/roles/audit-logs?${params.toString()}`);
+}

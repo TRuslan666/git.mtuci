@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -20,6 +20,7 @@ from app.core.permissions import (
 from app.models.user import User, UserRole
 from app.models.role_permissions import RolePermission, TrustedAssistant
 from app.models.permission_audit import PermissionAudit
+from app.services.permission_service import log_permission_change, get_audit_logs
 
 router = APIRouter(prefix="/roles", tags=["roles"])
 
@@ -283,9 +284,15 @@ async def save_role_permissions(
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Only admins can modify permissions")
     
+    # Collect changes for audit log
+    changed_perms = []
+    for category in permissions:
+        for perm in category.permissions:
+            changed_perms.append({"id": perm.id, "enabled": perm.enabled})
+    
     # Delete existing custom permissions for this role
     await session.execute(
-        select(RolePermission)
+        delete(RolePermission)
         .where(RolePermission.role == role.value)
     )
     
@@ -299,7 +306,20 @@ async def save_role_permissions(
             )
             session.add(db_perm)
     
+    # Log the change
+    await log_permission_change(
+        session=session,
+        actor=current_user,
+        target_role=role,
+        action="save_batch",
+        details={"permissions": changed_perms}
+    )
+    
     await session.commit()
+    
+    # Invalidate cache so users pick up new permissions immediately
+    invalidate_role_permissions_cache(role)
+    
     return {"success": True, "message": f"Permissions updated for {role.value}"}
 
 
@@ -315,10 +335,22 @@ async def reset_role_permissions(
     
     # Delete custom permissions for this role
     await session.execute(
-        select(RolePermission)
+        delete(RolePermission)
         .where(RolePermission.role == role.value)
     )
+    
+    # Log the reset
+    await log_permission_change(
+        session=session,
+        actor=current_user,
+        target_role=role,
+        action="reset"
+    )
+    
     await session.commit()
+    
+    # Invalidate cache so users pick up default permissions immediately
+    invalidate_role_permissions_cache(role)
     
     if role.value not in PERMISSION_TEMPLATES:
         raise HTTPException(status_code=404, detail="Role not found")
@@ -408,3 +440,42 @@ async def untrust_assistant(
     await session.delete(trusted)
     await session.commit()
     return {"success": True, "message": "Removed from trusted assistants"}
+
+
+@router.get("/audit-logs")
+async def get_permission_audit_logs(
+    target_role: UserRole | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Get permission audit logs (admin only)."""
+    if current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Only admins can view audit logs")
+    
+    logs = await get_audit_logs(session, target_role, limit, offset)
+    
+    # Get actor details
+    actor_ids = [log.actor_id for log in logs if log.actor_id]
+    actors = {}
+    if actor_ids:
+        result = await session.execute(
+            select(User.id, User.full_name).where(User.id.in_(actor_ids))
+        )
+        actors = {str(row[0]): row[1] for row in result.all()}
+    
+    return [
+        {
+            "id": str(log.id),
+            "actor_id": str(log.actor_id) if log.actor_id else None,
+            "actor_name": actors.get(str(log.actor_id), "Unknown") if log.actor_id else "System",
+            "actor_role": log.actor_role,
+            "target_role": log.target_role,
+            "action": log.action,
+            "permission_id": log.permission_id,
+            "details": json.loads(log.details) if log.details else None,
+            "created_at": log.created_at.isoformat(),
+        }
+        for log in logs
+    ]

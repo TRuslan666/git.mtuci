@@ -13,6 +13,9 @@ import {
   GraduationCap,
   Settings,
   Loader2,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   getRoles,
@@ -22,9 +25,11 @@ import {
   resetRolePermissions,
   trustLaborant,
   untrustLaborant,
+  getAuditLogs,
   type Role,
   type PermissionCategory,
-  type Laborant
+  type Laborant,
+  type AuditLog
 } from "../api/rolesApi";
 import toast from "react-hot-toast";
 
@@ -118,9 +123,31 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
 
   // Check if permissions have changed
   const hasChanges = JSON.stringify(categories) !== JSON.stringify(initialCategories);
+
+  // Load audit logs
+  const loadAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const logs = await getAuditLogs(selectedRole, 20);
+      setAuditLogs(logs);
+    } catch (error) {
+      console.error("Failed to load audit logs:", error);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showAuditLogs && currentRole?.id === "admin") {
+      loadAuditLogs();
+    }
+  }, [showAuditLogs, selectedRole]);
 
   // Load roles on mount
   useEffect(() => {
@@ -422,6 +449,70 @@ export default function RolesPage() {
                   </div>
                 );
               })}
+
+              {/* Audit Logs - Only for Admin */}
+              {currentRole?.id === "admin" && (
+                <>
+                  <div className="border-t border-[#2d2d2d] mb-6" />
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => setShowAuditLogs(!showAuditLogs)}
+                      className="flex items-center justify-between w-full p-3 rounded-lg bg-gray-50 dark:bg-[#252525] hover:bg-gray-100 dark:hover:bg-[#2d2d2d] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <History className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          История изменений прав
+                        </span>
+                      </div>
+                      {showAuditLogs ? (
+                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      )}
+                    </button>
+
+                    {showAuditLogs && (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {auditLoading ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                          </div>
+                        ) : auditLogs.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">
+                            Нет записей для этой роли
+                          </p>
+                        ) : (
+                          auditLogs.map((log) => (
+                            <div
+                              key={log.id}
+                              className="p-3 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d]"
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {log.actor_name}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(log.created_at).toLocaleString("ru-RU")}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400">
+                                  {log.target_role}
+                                </span>
+                                <span className="text-gray-500">
+                                  {log.action === "save_batch" ? "изменил права" :
+                                   log.action === "reset" ? "сбросил права" : log.action}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Assistant Management - Only for Teacher role */}
               {selectedRole === "teacher" && (
