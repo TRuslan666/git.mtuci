@@ -1,45 +1,54 @@
-export default function Footer() {
-  const commitCount = 42; // TODO: получать из API
-  const version = "v1.2.0"; // TODO: получать из конфига
+import { Github, GitBranch, AlertCircle, BookOpen } from "lucide-react";
+
+interface FooterProps {
+  isDarkTheme?: boolean;
+}
+
+export default function Footer({ isDarkTheme = true }: FooterProps) {
+  const commitCount = 42;
+  const version = "v1.2.0";
 
   return (
-    <footer className="border-t border-[#d4cfe6] bg-white transition-colors dark:bg-[#1c1c1e] dark:border-[#2d2d2d]">
-      <div className="mx-auto max-w-6xl px-4 py-2">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 text-sm text-gray-600 dark:text-gray-400">
-          {/* Левая колонка (под лого) */}
-          <div className="flex items-center gap-4">
+    <footer className="border-t border-[#2d2d2d] bg-[#161616]">
+      <div className="mx-auto max-w-7xl px-4 py-3">
+        <div className="flex items-center justify-between text-sm">
+          {/* Left: Logo & Links */}
+          <div className="flex items-center gap-6">
             <a
               href="https://mtuci.ru"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#372579] hover:underline"
+              className="text-[#8b949e] hover:text-[#ccd0d4] transition-colors font-medium"
             >
               MTUCI.ru
             </a>
-            <span className="text-gray-300 dark:text-gray-600">|</span>
-            <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-              Сообщить об ошибке
+            <div className="h-4 w-px bg-[#30363d]" />
+            <button className="flex items-center gap-1.5 text-[#8b949e] hover:text-[#ccd0d4] transition-colors">
+              <AlertCircle className="h-4 w-4" />
+              <span>Сообщить об ошибке</span>
             </button>
           </div>
 
-          {/* Центральная колонка */}
-          <div className="flex items-center justify-center gap-4">
-            <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-              Шпаргалка по Git
+          {/* Center: Actions */}
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-1.5 text-[#8b949e] hover:text-[#ccd0d4] transition-colors">
+              <BookOpen className="h-4 w-4" />
+              <span>Шпаргалка по Git</span>
             </button>
-            <button className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-white transition hover:bg-gray-800">
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              Импорт из GitHub
+            <button className="flex items-center gap-1.5 rounded-md bg-[#21262d] px-3 py-1.5 text-[#ccd0d4] hover:bg-[#30363d] transition-colors border border-[#30363d]">
+              <Github className="h-4 w-4" />
+              <span>Импорт из GitHub</span>
             </button>
           </div>
 
-          {/* Правая колонка (прижата к правому краю) */}
-          <div className="flex items-center justify-end gap-3 text-xs text-gray-500 dark:text-gray-500">
-            <span>{commitCount} коммитов</span>
-            <span className="text-gray-300 dark:text-gray-600">•</span>
-            <span>{version}</span>
+          {/* Right: Version */}
+          <div className="flex items-center gap-3 text-xs text-[#6e7681]">
+            <div className="flex items-center gap-1.5">
+              <GitBranch className="h-3.5 w-3.5" />
+              <span>{commitCount} коммитов</span>
+            </div>
+            <span className="text-[#30363d]">•</span>
+            <span className="font-mono">{version}</span>
           </div>
         </div>
       </div>

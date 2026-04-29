@@ -1,9 +1,7 @@
 """
 Roles and permissions API routes
 """
-from __future__ import annotations
-
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 import json
 from fastapi import APIRouter, Depends, HTTPException, status

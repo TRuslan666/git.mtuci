@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import Enum
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Enum as SAEnum
 
 from app.models.base import Base
+
+
+class RepositoryType(str, Enum):
+    public = "public"
+    private = "private"
+    course = "course"
 
 
 class Repository(Base):
@@ -24,12 +32,6 @@ class Repository(Base):
         nullable=False,
         index=True,
     )
-    faculty_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("faculties.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -41,3 +43,13 @@ class Repository(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    # Repository visibility type
+    repo_type: Mapped[RepositoryType] = mapped_column(
+        SAEnum(RepositoryType, name="repository_type"),
+        nullable=False,
+        default=RepositoryType.public,
+    )
+    # Primary programming language
+    language: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Blocked status
+    is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

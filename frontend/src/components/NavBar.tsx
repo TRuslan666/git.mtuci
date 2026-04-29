@@ -4,7 +4,12 @@ import { clearToken } from "../api/client";
 import { getMe, invalidateMeCache } from "../api/authApi";
 import type { UserRole } from "../api/types";
 
-export default function NavBar() {
+interface NavBarProps {
+  isDarkTheme?: boolean;
+  onToggleTheme?: () => void;
+}
+
+export default function NavBar({ isDarkTheme = true, onToggleTheme }: NavBarProps) {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("User");
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -12,20 +17,14 @@ export default function NavBar() {
   const [avatarDisplayMode, setAvatarDisplayMode] = useState<string>("cover");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem("theme");
-    return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  });
 
   useEffect(() => {
-    if (isDark) {
+    if (isDarkTheme) {
       document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
     }
-  }, [isDark]);
+  }, [isDarkTheme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,8 +69,8 @@ export default function NavBar() {
     };
   }, []);
 
-  function toggleTheme() {
-    setIsDark(!isDark);
+  function handleToggleTheme() {
+    onToggleTheme?.();
   }
 
   function onLogout() {
@@ -144,11 +143,11 @@ export default function NavBar() {
 
           {/* Theme toggle */}
           <button
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/90 transition hover:bg-white/20 hover:text-white"
-            title={isDark ? "Светлая тема" : "Темная тема"}
+            title={isDarkTheme ? "Светлая тема" : "Темная тема"}
           >
-            {isDark ? "🌙" : "☀️"}
+            {isDarkTheme ? "🌙" : "☀️"}
           </button>
 
           {/* User dropdown */}

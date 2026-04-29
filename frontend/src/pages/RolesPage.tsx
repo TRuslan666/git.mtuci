@@ -307,12 +307,12 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#f5f3fa] dark:bg-[#0f0f10] text-gray-900 dark:text-white transition-colors">
+    <div className="h-full overflow-y-auto bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Роли и доступ</h1>
-          <span className="text-sm text-gray-500">{roles.length} ролей</span>
+          <h1 className="text-2xl font-bold text-[#ccd0d4]">Роли и доступ</h1>
+          <span className="text-sm text-[#6e7681]">{roles.length} ролей</span>
         </div>
 
         {/* Role Cards */}
@@ -324,18 +324,18 @@ export default function RolesPage() {
               <button
                 key={role.id}
                 onClick={() => handleRoleChange(role.id as RoleType)}
-                className={`text-left p-5 rounded-xl bg-white dark:bg-[#1e1e1e] border transition-all shadow-sm ${
+                className={`text-left p-5 rounded-xl bg-[#161616] border transition-all ${
                   isActive
                     ? "border-blue-500/50 shadow-lg shadow-blue-500/10"
-                    : "border-[#d4cfe6] dark:border-[#2d2d2d] hover:border-[#b8b0d9] dark:hover:border-[#3f3f46]"
+                    : "border-[#2d2d2d] hover:border-[#3d3d3d]"
                 }`}
               >
                 <div className={`w-10 h-10 rounded-lg ${role.icon_bg} flex items-center justify-center mb-3`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">{role.name}</h3>
-                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{role.description}</p>
-                <p className="text-sm text-gray-400">{role.user_count} {pluralizeUsers(role.user_count)}</p>
+                <h3 className="text-base font-semibold text-[#ccd0d4] mb-1">{role.name}</h3>
+                <p className="text-xs text-[#6e7681] mb-3 line-clamp-2">{role.description}</p>
+                <p className="text-sm text-[#8b949e]">{role.user_count} {pluralizeUsers(role.user_count)}</p>
               </button>
             );
           })}
@@ -344,8 +344,8 @@ export default function RolesPage() {
         {/* Split Screen */}
         <div className="grid grid-cols-[35%_1fr] gap-6">
           {/* Left Column - Role Selection */}
-          <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <div className="bg-[#161616] rounded-xl border border-[#2d2d2d] p-5">
+            <h2 className="text-sm font-semibold text-[#6e7681] uppercase tracking-wider mb-4">
               Выбрать роль для редактирования
             </h2>
             <div className="space-y-2">

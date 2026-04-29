@@ -1,22 +1,23 @@
-from __future__ import annotations
-
 import os
 import secrets
 import string
 from datetime import datetime
+from typing import List, Optional
 from uuid import UUID
 
 import httpx
 import psutil
-from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
+from app.models.repository import Repository, RepositoryType
 from app.models.user import User, UserRole
+from app.schemas.repository import RepositoryRead
 from app.schemas.user import (
     AdminResetPasswordRequest,
     AdminResetPasswordResponse,
@@ -81,7 +82,7 @@ def _generate_password(length: int = 12) -> str:
 async def admin_get_users(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> list[AdminUserRead]:
+) -> List[AdminUserRead]:
     users = await get_all_users(session)
     return [AdminUserRead.model_validate(u) for u in users]
 
@@ -163,7 +164,7 @@ async def admin_delete_user(
 @require_permission("user_edit")
 async def admin_reset_password(
     user_id: UUID,
-    payload: AdminResetPasswordRequest | None = Body(None),
+    payload: Optional[AdminResetPasswordRequest] = None,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminResetPasswordResponse:
@@ -189,6 +190,7 @@ async def admin_reset_password(
 @require_permission("settings_view")
 async def admin_system_metrics(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> SystemMetrics:
 
     # CPU
@@ -221,6 +223,7 @@ async def admin_system_metrics(
 @require_permission("settings_view")
 async def admin_service_status(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ServiceStatus:
 
     # Check Git service (Gitea)
@@ -247,6 +250,7 @@ async def admin_service_status(
 @require_permission("logs_view")
 async def admin_backups(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> BackupInfo:
 
     # Check for backup files in /backups directory
@@ -280,6 +284,7 @@ async def admin_backups(
 @require_permission("settings_edit")
 async def admin_create_backup(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
 
     import subprocess
@@ -329,3 +334,78 @@ async def admin_create_backup(
         raise HTTPException(status_code=500, detail="Backup timeout")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup error: {str(e)}")
+
+
+@router.get("/repositories", response_model=List[RepositoryRead])
+@require_permission("repo_view")
+async def admin_list_repositories(
+    repo_type: Optional[RepositoryType] = None,
+    language: Optional[str] = None,
+    is_blocked: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> List[RepositoryRead]:
+    """Get all repositories with optional filters and pagination (admin only)."""
+    query = select(Repository, User.full_name.label("owner_name")).join(
+        User, Repository.owner_id == User.id
+    )
+
+    if repo_type:
+        query = query.where(Repository.repo_type == repo_type)
+    if language:
+        query = query.where(Repository.language == language)
+    if is_blocked is not None:
+        query = query.where(Repository.is_blocked == is_blocked)
+
+    query = query.order_by(Repository.created_at.desc()).offset(skip).limit(limit)
+
+    result = await session.execute(query)
+    repos_with_owners = result.all()
+
+    repositories = []
+    for repo, owner_name in repos_with_owners:
+        repo_dict = {
+            "id": repo.id,
+            "name": repo.name,
+            "description": repo.description,
+            "gitea_repo_name": repo.gitea_repo_name,
+            "clone_url": repo.clone_url,
+            "owner_id": repo.owner_id,
+            "owner_full_name": owner_name,
+            "commits_count": 0,
+            "is_public": repo.repo_type == RepositoryType.public,
+            "repo_type": repo.repo_type,
+            "language": repo.language,
+            "is_blocked": repo.is_blocked,
+            "created_at": repo.created_at,
+            "updated_at": repo.updated_at,
+        }
+        repositories.append(RepositoryRead.model_validate(repo_dict))
+
+    return repositories
+
+
+@router.post("/repositories/{repository_id}/toggle-block", response_model=RepositoryRead)
+@require_permission("repo_edit")
+async def admin_toggle_repository_block(
+    repository_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RepositoryRead:
+    """Toggle repository blocked status (admin only)."""
+    result = await session.execute(
+        select(Repository).where(Repository.id == repository_id)
+    )
+    repository = result.scalar_one_or_none()
+    if not repository:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    repository.is_blocked = not repository.is_blocked
+    await session.commit()
+    await session.refresh(repository)
+    return RepositoryRead.model_validate(repository)

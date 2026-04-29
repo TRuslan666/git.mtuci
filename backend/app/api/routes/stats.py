@@ -1,10 +1,8 @@
 """
 Stats API routes - для дашборда и аналитики
 """
-from __future__ import annotations
-
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
@@ -15,8 +13,7 @@ from uuid import UUID
 from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
-from app.models.faculty import Faculty
-from app.models.repository import Repository
+from app.models.repository import Repository, RepositoryType
 from app.models.user import User, UserRole
 from app.services.gitea_service import list_repo_commits, GITEA_ADMIN_USERNAME
 
@@ -40,6 +37,52 @@ FACULTY_COLORS = {
 }
 
 
+class OverviewStats(BaseModel):
+    total_users: int
+    total_students: int
+    total_repositories: int
+    total_commits: int
+    repositories_by_type: Dict[str, int]
+
+
+@router.get("/overview", response_model=OverviewStats)
+@require_permission("settings_view")
+async def get_overview_stats(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> OverviewStats:
+    """Get overview statistics with repository breakdown by type."""
+    # Total users
+    users_result = await session.execute(select(func.count(User.id)))
+    total_users = users_result.scalar() or 0
+
+    # Active students
+    students_result = await session.execute(
+        select(func.count(User.id)).where(User.role == UserRole.student)
+    )
+    total_students = students_result.scalar() or 0
+
+    # Total repositories
+    repos_result = await session.execute(select(func.count(Repository.id)))
+    total_repos = repos_result.scalar() or 0
+
+    # Repository counts by type
+    repos_by_type = {}
+    for repo_type in RepositoryType:
+        count_result = await session.execute(
+            select(func.count(Repository.id)).where(Repository.repo_type == repo_type)
+        )
+        repos_by_type[repo_type.value] = count_result.scalar() or 0
+
+    return OverviewStats(
+        total_users=total_users,
+        total_students=total_students,
+        total_repositories=total_repos,
+        total_commits=981,  # Mock - will be real from Gitea later
+        repositories_by_type=repos_by_type,
+    )
+
+
 @router.get("/commits-by-faculty", response_model=list[FacultyCommitsStat])
 @require_permission("logs_view")
 async def get_commits_by_faculty(
@@ -49,79 +92,11 @@ async def get_commits_by_faculty(
     """
     Get commit statistics grouped by faculty.
     
-    Fetches real commit counts from Gitea API for all repositories.
-    Falls back to repository count-based estimation if Gitea is unavailable.
+    Note: Faculty grouping is disabled as faculties table has been removed.
+    Returns empty list.
     """
-    # Get all faculties from DB
-    result = await session.execute(select(Faculty).order_by(Faculty.short_name))
-    faculties = result.scalars().all()
-    
-    # Get all repositories with their faculties
-    repos_result = await session.execute(
-        select(Repository, Faculty.short_name, Faculty.name)
-        .join(Faculty, Repository.faculty_id == Faculty.id)
-        .where(Repository.gitea_repo_name.is_not(None))
-    )
-    repos_with_faculty = repos_result.all()
-    
-    # Group repositories by faculty
-    faculty_repos: dict[str, list[tuple[Repository, str, str]]] = {}
-    for repo, fac_short, fac_name in repos_with_faculty:
-        if fac_short not in faculty_repos:
-            faculty_repos[fac_short] = []
-        faculty_repos[fac_short].append((repo, fac_short, fac_name))
-    
-    # Calculate real commit counts from Gitea
-    stats = []
-    for faculty in faculties:
-        fac_short = faculty.short_name
-        repos = faculty_repos.get(fac_short, [])
-        
-        total_commits = 0
-        gitea_available = True
-        
-        for repo, _, _ in repos:
-            if not repo.gitea_repo_name:
-                continue
-                
-            try:
-                # Fetch real commits from Gitea
-                commits_raw, _ = await list_repo_commits(
-                    owner=GITEA_ADMIN_USERNAME,
-                    repo=repo.gitea_repo_name,
-                    limit=100,
-                    max_pages=10,  # Limit to prevent timeouts
-                )
-                total_commits += len(commits_raw)
-            except Exception:
-                # Gitea unavailable or repo doesn't exist
-                gitea_available = False
-                # Fall back to estimation: ~25 commits per repo
-                total_commits += 25
-        
-        # If no repos or Gitea failed, use fallback estimation
-        if not repos:
-            # Check repositories without faculty assigned
-            unassigned_result = await session.execute(
-                select(func.count(Repository.id)).where(
-                    (Repository.faculty_id.is_(None)) | 
-                    (Repository.faculty_id == faculty.id)
-                )
-            )
-            repo_count = unassigned_result.scalar() or 0
-            total_commits = repo_count * 25
-        
-        stats.append(FacultyCommitsStat(
-            faculty=faculty.name,
-            short_name=fac_short,
-            commits=total_commits,
-            color=FACULTY_COLORS.get(fac_short, "bg-gray-500"),
-        ))
-    
-    # Sort by commits descending
-    stats.sort(key=lambda x: x.commits, reverse=True)
-    
-    return stats
+    # Faculties table removed - return empty list
+    return []
 
 
 @router.get("/dashboard-summary")

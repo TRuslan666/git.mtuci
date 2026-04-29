@@ -1,18 +1,17 @@
-from __future__ import annotations
-
 import os
 from datetime import datetime, timezone
+from typing import List, Optional
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
-from app.models.repository import Repository
+from app.models.repository import Repository, RepositoryType
 from app.models.user import User
 from app.schemas.repository import (
     RepositoryCreateRequest,
@@ -27,7 +26,7 @@ GITEA_TOKEN = os.getenv("GITEA_TOKEN", "")
 GITEA_ADMIN = os.getenv("GITEA_ADMIN_USERNAME", "gitea_admin")
 
 
-async def create_gitea_repository(name: str, description: str | None, owner_username: str) -> dict:
+async def create_gitea_repository(name: str, description: Optional[str], owner_username: str) -> dict:
     """Create a repository in Gitea via API."""
     import logging
     logger = logging.getLogger(__name__)
@@ -314,3 +313,93 @@ async def delete_repository(
     await session.delete(repository)
     await session.commit()
     return None
+
+
+@router.get("/all", response_model=list[RepositoryRead])
+@require_permission("repo_view")
+async def list_all_repositories(
+    repo_type: RepositoryType | None = Query(None, description="Filter by repository type"),
+    language: str | None = Query(None, description="Filter by programming language"),
+    faculty_id: UUID | None = Query(None, description="Filter by faculty"),
+    is_blocked: bool | None = Query(None, description="Filter by blocked status"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[RepositoryRead]:
+    """Get all repositories with optional filters and pagination (admin/teacher only)."""
+    # Build query with filters
+    query = select(Repository, User.full_name.label("owner_name")).join(
+        User, Repository.owner_id == User.id
+    )
+    
+    if repo_type:
+        query = query.where(Repository.repo_type == repo_type)
+    if language:
+        query = query.where(Repository.language == language)
+    if faculty_id:
+        query = query.where(Repository.faculty_id == faculty_id)
+    if is_blocked is not None:
+        query = query.where(Repository.is_blocked == is_blocked)
+    
+    # Order by created_at desc and apply pagination
+    query = query.order_by(Repository.created_at.desc()).offset(skip).limit(limit)
+    
+    result = await session.execute(query)
+    repos_with_owners = result.all()
+    
+    # Convert to RepositoryRead with owner_full_name
+    repositories = []
+    for repo, owner_name in repos_with_owners:
+        repo_dict = {
+            "id": repo.id,
+            "name": repo.name,
+            "description": repo.description,
+            "gitea_repo_name": repo.gitea_repo_name,
+            "clone_url": repo.clone_url,
+            "owner_id": repo.owner_id,
+            "owner_full_name": owner_name,
+            "commits_count": 0,  # Can be populated from Gitea if needed
+            "is_public": repo.repo_type == RepositoryType.public,
+            "repo_type": repo.repo_type,
+            "language": repo.language,
+            "is_blocked": repo.is_blocked,
+            "faculty_id": repo.faculty_id,
+            "created_at": repo.created_at,
+            "updated_at": repo.updated_at,
+        }
+        repositories.append(RepositoryRead.model_validate(repo_dict))
+    
+    return repositories
+
+
+@router.get("/stats", response_model=dict)
+@require_permission("repo_view")
+async def get_repository_stats(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Get repository statistics (admin/teacher only)."""
+    # Total count
+    total_result = await session.execute(select(func.count(Repository.id)))
+    total = total_result.scalar() or 0
+    
+    # Count by type
+    type_counts = {}
+    for repo_type in RepositoryType:
+        count_result = await session.execute(
+            select(func.count(Repository.id)).where(Repository.repo_type == repo_type)
+        )
+        type_counts[repo_type.value] = count_result.scalar() or 0
+    
+    # Blocked count
+    blocked_result = await session.execute(
+        select(func.count(Repository.id)).where(Repository.is_blocked == True)
+    )
+    blocked = blocked_result.scalar() or 0
+    
+    return {
+        "total": total,
+        "by_type": type_counts,
+        "blocked": blocked,
+    }

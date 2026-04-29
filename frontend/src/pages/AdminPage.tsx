@@ -87,17 +87,17 @@ function getNotificationColor(type: Notification['type']): string {
 
 function StatCard({ title, value, trend, trendUp, icon: Icon }: StatCardProps) {
   return (
-    <div className="bg-white border-gray-200 rounded-xl border p-5 shadow-sm transition-colors dark:bg-[#1e1e1e] dark:border-[#2d2d2d]">
+    <div className="bg-[#161616] border-[#2d2d2d] rounded-xl border p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
-          <p className={`mt-1 text-xs font-medium ${trendUp ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+          <p className="text-sm font-medium text-[#8b949e]">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-[#ccd0d4]">{value}</p>
+          <p className={`mt-1 text-xs font-medium ${trendUp ? "text-green-400" : "text-red-400"}`}>
             {trendUp ? "↑" : "↓"} {trend}
           </p>
         </div>
-        <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#2d2d2d]">
-          <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        <div className="p-2 rounded-lg bg-[#1f2937]">
+          <Icon className="h-5 w-5 text-[#6e7681]" />
         </div>
       </div>
     </div>
@@ -106,9 +106,9 @@ function StatCard({ title, value, trend, trendUp, icon: Icon }: StatCardProps) {
 
 function getStatusBadge(status: string) {
   const styles = {
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400",
-    active: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400",
-    blocked: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400",
+    pending: "bg-yellow-500/20 text-yellow-400",
+    active: "bg-green-500/20 text-green-400",
+    blocked: "bg-red-500/20 text-red-400",
   };
   const labels = { pending: "Ожидает", active: "Активен", blocked: "Заблокирован" };
   const style = styles[status as keyof typeof styles] || styles.pending;

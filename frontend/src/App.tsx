@@ -1,12 +1,14 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import AuthRequired from "./components/AuthRequired";
 import AdminRequired from "./components/AdminRequired";
 import NavBar from "./components/NavBar";
+import AdminHeader from "./components/AdminHeader";
 import Sidebar from "./components/Sidebar";
 import Footer from "./components/Footer";
+import { PendingCountProvider } from "./context/PendingCountContext";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -29,18 +31,38 @@ const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 
 const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
+const ADMIN_PATHS = ["/admin", "/users", "/roles", "/admin/forks", "/admin/activity", "/admin/monitoring", "/admin/settings", "/repositories"];
+
 export default function App() {
   const location = useLocation();
   const isAuthPage = AUTH_PATHS.includes(location.pathname);
+  const isAdminPage = ADMIN_PATHS.some(path => location.pathname.startsWith(path));
+
+  // Theme state
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    const saved = localStorage.getItem("theme");
+    return saved ? saved === "dark" : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("theme", isDarkTheme ? "dark" : "light");
+  }, [isDarkTheme]);
+
+  const toggleTheme = () => setIsDarkTheme(prev => !prev);
+
+  // Theme colors
+  const bgColor = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const mainBgColor = isDarkTheme ? "bg-[#111111]" : "bg-white";
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f5f3fa] dark:bg-[#0f0f10] transition-colors">
-      {!isAuthPage ? <NavBar /> : null}
+    <PendingCountProvider>
+    <div className={`h-screen overflow-hidden ${bgColor}`}>
+      {!isAuthPage && (isAdminPage ? <AdminHeader isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} /> : <NavBar isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />)}
       <div className="flex h-[calc(100vh-56px)]">
-        {!isAuthPage ? <Sidebar /> : null}
+        {!isAuthPage ? <Sidebar isDarkTheme={isDarkTheme} /> : null}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <main className="flex-1 overflow-y-auto py-6 px-4 bg-[#f5f3fa] dark:bg-[#0f0f10] transition-colors">
-            <Suspense fallback={<div className="mx-auto max-w-7xl px-4 text-sm text-gray-600">Loading...</div>}>
+          <main className={`flex-1 overflow-y-auto py-6 px-4 ${mainBgColor}`}>
+            <Suspense fallback={<div className={`mx-auto max-w-7xl px-4 text-sm ${isDarkTheme ? "text-gray-600" : "text-gray-400"}`}>Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Navigate to="/home" replace />} />
                 <Route path="/home" element={<HomePage />} />
@@ -82,7 +104,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </main>
-          {!isAuthPage ? <Footer /> : null}
+          {!isAuthPage ? <Footer isDarkTheme={isDarkTheme} /> : null}
         </div>
       </div>
       <Toaster
@@ -90,9 +112,9 @@ export default function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: "#1e1e1e",
-            color: "#ffffff",
-            border: "1px solid #2d2d2d",
+            background: isDarkTheme ? "#1e1e1e" : "#ffffff",
+            color: isDarkTheme ? "#ffffff" : "#1f2937",
+            border: isDarkTheme ? "1px solid #2d2d2d" : "1px solid #e5e7eb",
             padding: "12px 16px",
             borderRadius: "8px",
           },
@@ -111,5 +133,6 @@ export default function App() {
         }}
       />
     </div>
+    </PendingCountProvider>
   );
 }
