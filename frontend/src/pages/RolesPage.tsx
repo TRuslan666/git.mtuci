@@ -114,7 +114,11 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   );
 }
 
-export default function RolesPage() {
+interface RolesPageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
   const [selectedRole, setSelectedRole] = useState<RoleType>("admin");
   const [categories, setCategories] = useState<PermissionCategoryState[]>([]);
   const [initialCategories, setInitialCategories] = useState<PermissionCategoryState[]>([]);
@@ -306,13 +310,21 @@ export default function RolesPage() {
     );
   }
 
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#111111] text-white" : "bg-[#f8f9fa] text-gray-900";
+  const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const cardBgLight = isDarkTheme ? "bg-[#252525]" : "bg-gray-100";
+  const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const textSecondary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const textTertiary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+
   return (
-    <div className="h-full overflow-y-auto bg-[#111111] text-white">
+    <div className={`h-full overflow-y-auto ${pageBg}`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-[#ccd0d4]">Роли и доступ</h1>
-          <span className="text-sm text-[#6e7681]">{roles.length} ролей</span>
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>Роли и доступ</h1>
+          <span className={`text-sm ${textSecondary}`}>{roles.length} ролей</span>
         </div>
 
         {/* Role Cards */}
@@ -357,14 +369,14 @@ export default function RolesPage() {
                     key={role.id}
                     onClick={() => handleRoleChange(role.id as RoleType)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                      isSelected ? "bg-gray-100 dark:bg-[#252525]" : "hover:bg-gray-100 dark:hover:bg-[#252525]"
+                      isSelected ? cardBgLight : isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-100"
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-lg ${role.icon_bg} flex items-center justify-center flex-shrink-0`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{role.name}</p>
+                      <p className={`text-sm font-medium ${textPrimary}`}>{role.name}</p>
                       <p className="text-xs text-gray-500">{role.user_count} {pluralizeUsers(role.user_count)}</p>
                     </div>
                     {isSelected ? (
@@ -383,10 +395,10 @@ export default function RolesPage() {
           </div>
 
           {/* Right Column - Permission Settings */}
-          <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] p-5 shadow-sm">
+          <div className={`rounded-xl border p-5 shadow-sm ${cardBg}`}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{currentRole?.name || "Роль"}</h2>
+                <h2 className={`text-lg font-semibold ${textPrimary}`}>{currentRole?.name || "Роль"}</h2>
                 <span className="text-gray-500">—</span>
                 <span className="text-gray-400">права доступа</span>
               </div>
@@ -394,7 +406,7 @@ export default function RolesPage() {
                 <button
                   onClick={handleReset}
                   disabled={permissionsLoading || (!hasChanges && categories.length > 0)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-[#252525] border border-[#d4cfe6] dark:border-[#2d2d2d] text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${isDarkTheme ? "bg-[#252525] border-[#2d2d2d] text-gray-400 hover:text-white" : "bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-900"}`}
                 >
                   <RotateCcw className="h-4 w-4" />
                   Сбросить
@@ -405,7 +417,7 @@ export default function RolesPage() {
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
                     hasChanges
                       ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      : isDarkTheme ? "bg-gray-700 text-gray-400 cursor-not-allowed" : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
                   <Save className="h-4 w-4" />
@@ -430,10 +442,10 @@ export default function RolesPage() {
                       {category.permissions.map((permission: Permission, permissionIndex: number) => (
                         <div
                           key={permission.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-[#252525]"
+                          className={`flex items-center justify-between p-3 rounded-lg ${cardBgLight}`}
                         >
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{permission.name}</p>
+                            <p className={`text-sm font-medium ${textPrimary}`}>{permission.name}</p>
                             <p className="text-xs text-gray-500">{permission.description}</p>
                           </div>
                           <div className="flex items-center gap-3">

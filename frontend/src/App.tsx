@@ -90,9 +90,9 @@ export default function App() {
                   <Route path="/logs" element={<LogsPage />} />
                   <Route path="/settings" element={<ProfilePage />} />
                   <Route element={<AdminRequired />}>
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/users" element={<UsersPage />} />
-                    <Route path="/roles" element={<RolesPage />} />
+                    <Route path="/admin" element={<AdminPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/users" element={<UsersPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/roles" element={<RolesPage isDarkTheme={isDarkTheme} />} />
                     <Route path="/admin/forks" element={<ForksPage />} />
                     <Route path="/admin/activity" element={<ActivityPage />} />
                     <Route path="/admin/monitoring" element={<MonitoringPage />} />

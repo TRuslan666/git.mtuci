@@ -46,6 +46,10 @@ interface StatCardProps {
   icon: React.ElementType;
 }
 
+interface AdminPageProps {
+  isDarkTheme?: boolean;
+}
+
 interface Notification {
   id: string;
   type: 'critical' | 'warning' | 'info' | 'success';
@@ -120,7 +124,7 @@ function getStatusBadge(status: string) {
   );
 }
 
-export default function AdminPage() {
+export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const { hasPermission } = usePermissions();
   const [loading, setLoading] = useState(true);
@@ -326,21 +330,27 @@ export default function AdminPage() {
     { title: "Заблокировано", value: stats.blocked.toLocaleString(), trend: formatTrend(currentBlocked, prevBlocked), trendUp: currentBlocked >= prevBlocked, icon: Clock },
   ];
 
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-[#f8f9fa]";
+  const textPrimary = isDarkTheme ? "text-white" : "text-[#1a1a1a]";
+  const textSecondary = isDarkTheme ? "text-gray-400" : "text-gray-500";
+  const buttonBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d] text-gray-300 hover:bg-[#2d2d2d]" : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50";
+
   return (
-    <div className="h-full overflow-auto bg-[#f8f9fa] transition-colors dark:bg-[#0f0f10]">
+    <div className={`h-full overflow-auto ${pageBg} transition-colors`}>
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#1a1a1a] transition-colors dark:text-white">Панель администратора</h1>
-            <p className="mt-1 text-sm text-gray-500 transition-colors dark:text-gray-400">
+            <h1 className={`text-2xl font-bold transition-colors ${textPrimary}`}>Панель администратора</h1>
+            <p className={`mt-1 text-sm transition-colors ${textSecondary}`}>
               API: <span className={systemStatus.api === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.api === "online" ? "Online" : "Offline"} | DB: <span className={systemStatus.db === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.db === "online" ? "Online" : "Offline"}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-[#1e1e1e] dark:border-[#2d2d2d] dark:text-gray-300 dark:hover:bg-[#2d2d2d]"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${buttonBg}`}
             >
               <Download className="h-4 w-4" />
               Экспорт отчёта

@@ -75,7 +75,11 @@ function getStatusBadge(status: User["status"]) {
   );
 }
 
-export default function UsersPage() {
+interface UsersPageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function UsersPage({ isDarkTheme = true }: UsersPageProps) {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -422,25 +426,37 @@ useEffect(() => {
     setSelectedUsers([]);
   };
 
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-[#f5f3fa]";
+  const textPrimary = isDarkTheme ? "text-white" : "text-gray-900";
+  const cardBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-[#d4cfe6]";
+  const cardHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-50";
+  const textSecondary = isDarkTheme ? "text-gray-400" : "text-gray-500";
+  const textTertiary = isDarkTheme ? "text-gray-300" : "text-gray-600";
+  const headerBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const inputBg = isDarkTheme ? "bg-[#252525] border-[#3d3d3d]" : "bg-white border-gray-300";
+  const dividerColor = isDarkTheme ? "divide-[#2d2d2d]" : "divide-gray-100";
+  const tableHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-50";
+
   return (
-    <div className="h-full overflow-y-auto bg-[#f5f3fa] dark:bg-[#0f0f10] text-gray-900 dark:text-white transition-colors">
+    <div className={`h-full overflow-y-auto ${pageBg} ${textPrimary} transition-colors`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Все пользователи</h1>
-            <span className="text-sm text-gray-500">
+            <h1 className={`text-2xl font-bold ${textPrimary}`}>Все пользователи</h1>
+            <span className={`text-sm ${textSecondary}`}>
               {filteredUsers.length === totalUsers 
                 ? `${totalUsers} ${pluralizeRecords(totalUsers)}` 
                 : `Найдено ${filteredUsers.length} из ${totalUsers}`}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d] text-sm text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors shadow-sm">
+            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
               <Download className="h-4 w-4" />
               Экспорт CSV
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d] text-sm text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors shadow-sm">
+            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
               <Upload className="h-4 w-4" />
               Импорт
             </button>
