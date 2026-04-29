@@ -149,7 +149,7 @@ export default function Sidebar({ isDarkTheme = true }: SidebarProps) {
   if (userRole === null) {
     console.log("[Sidebar] Role is null, showing loading state");
     return (
-      <aside className={`w-[260px] flex-shrink-0 min-h-screen border-r ${isDarkTheme ? "border-[#2d2d2d] bg-[#111111]" : "border-gray-200 bg-white"}`}>
+      <aside className={`w-[260px] flex-shrink-0 h-full border-r ${isDarkTheme ? "border-[#2d2d2d] bg-[#111111]" : "border-gray-200 bg-white"}`}>
         <div className={`p-4 text-sm ${isDarkTheme ? "text-[#8b949e]" : "text-gray-500"}`}>Loading...</div>
       </aside>
     );
@@ -171,7 +171,7 @@ export default function Sidebar({ isDarkTheme = true }: SidebarProps) {
   const activeIconColor = isDarkTheme ? "text-white" : "text-blue-600";
 
   return (
-    <aside className={`w-[260px] flex-shrink-0 min-h-screen border-r ${sidebarBorder} ${sidebarBg}`}>
+    <aside className={`w-[260px] flex-shrink-0 h-full border-r ${sidebarBorder} ${sidebarBg}`}>
       <nav className="p-4">
         {menuSections.map((section) => (
           <div key={section.title} className="mb-6">

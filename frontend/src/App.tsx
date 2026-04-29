@@ -56,11 +56,11 @@ export default function App() {
 
   return (
     <PendingCountProvider>
-    <div className={`h-screen overflow-hidden ${bgColor}`}>
+    <div className={`h-screen flex flex-col ${bgColor}`}>
       {!isAuthPage && (isAdminPage ? <AdminHeader isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} /> : <NavBar isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />)}
-      <div className="flex h-[calc(100vh-56px)]">
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
         {!isAuthPage ? <Sidebar isDarkTheme={isDarkTheme} /> : null}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col min-h-0">
           <main className={`flex-1 overflow-y-auto py-6 px-4 ${mainBgColor}`}>
             <Suspense fallback={<div className={`mx-auto max-w-7xl px-4 text-sm ${isDarkTheme ? "text-gray-600" : "text-gray-400"}`}>Loading...</div>}>
               <Routes>
