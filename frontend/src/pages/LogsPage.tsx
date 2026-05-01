@@ -7,7 +7,7 @@ interface LogsPageProps {
 
 export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#111111] text-white" : "bg-slate-50 text-slate-900";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#111111", color: "white" } : { backgroundColor: "#f8fafc", color: "#0f172a" };
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-slate-900";
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-slate-200";
   const iconBg = isDarkTheme ? "bg-[#1f2937]" : "bg-gray-100";
@@ -17,7 +17,7 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
   const mutedText = isDarkTheme ? "text-[#6e7681]" : "text-slate-500";
 
   return (
-    <div className={`h-full overflow-y-auto ${pageBg} transition-colors`}>
+    <div className="h-full overflow-y-auto transition-colors">
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 pb-20">
         {/* Header */}
         <AdminPageHeader isDarkTheme={isDarkTheme} title="Логи" />

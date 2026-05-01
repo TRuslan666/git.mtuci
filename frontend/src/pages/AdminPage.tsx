@@ -339,7 +339,7 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
   ];
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-[#f8f9fa]";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8f9fa" };
   const textPrimary = isDarkTheme ? "text-white" : "text-[#1a1a1a]";
   const textSecondary = isDarkTheme ? "text-gray-400" : "text-gray-500";
   const textTertiary = isDarkTheme ? "text-gray-300" : "text-gray-600";
@@ -355,7 +355,7 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
   const dropdownIcon = isDarkTheme ? "text-gray-400" : "text-gray-500";
 
   return (
-    <div className={`h-full overflow-auto ${pageBg} transition-colors`}>
+    <div className="h-full overflow-auto transition-colors">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">

@@ -31,7 +31,7 @@ const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 
 const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
-const ADMIN_PATHS = ["/admin", "/users", "/roles", "/admin/forks", "/admin/activity", "/admin/monitoring", "/admin/settings", "/repositories", "/logs"];
+const ADMIN_PATHS = ["/admin", "/users", "/roles", "/admin/forks", "/admin/activity", "/admin/monitoring", "/admin/settings", "/repositories", "/logs", "/dashboard"];
 
 export default function App() {
   const location = useLocation();
@@ -50,18 +50,18 @@ export default function App() {
 
   const toggleTheme = () => setIsDarkTheme(prev => !prev);
 
-  // Theme colors
-  const bgColor = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
-  const mainBgColor = isDarkTheme ? "bg-[#111111]" : "bg-white";
+  // Theme colors - unified background
+  const appBgStyle = isDarkTheme ? { backgroundColor: "#111111" } : { backgroundColor: "#f9fafb" };
+  const mainBgStyle = isDarkTheme ? { backgroundColor: "#111111" } : { backgroundColor: "#ffffff" };
 
   return (
     <PendingCountProvider>
-    <div className={`h-screen flex flex-col ${bgColor}`}>
+    <div className="h-screen flex flex-col" style={appBgStyle}>
       {!isAuthPage && (isAdminPage ? <AdminHeader isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} /> : <NavBar isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />)}
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
         {!isAuthPage ? <Sidebar isDarkTheme={isDarkTheme} /> : null}
         <div className="flex flex-1 flex-col min-h-0">
-          <main className={`flex-1 overflow-y-auto py-6 px-4 ${mainBgColor}`}>
+          <main className="flex-1 overflow-y-auto py-6 px-4" style={mainBgStyle}>
             <Suspense fallback={<div className={`mx-auto max-w-7xl px-4 text-sm ${isDarkTheme ? "text-gray-600" : "text-gray-400"}`}>Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Navigate to="/home" replace />} />

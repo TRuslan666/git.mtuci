@@ -24,7 +24,7 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8fafc" };
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-[#faf9fd] border-[#d4cfe6]";
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
   const loadingText = isDarkTheme ? "text-[#6e7681]" : "text-gray-600";
@@ -130,11 +130,11 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
   }
 
   return (
-    <div className={`mx-auto max-w-3xl px-4 ${pageBg} transition-colors`}>
-      <h1 className={`mb-5 text-3xl font-semibold ${titleText} transition-colors`}>Профиль</h1>
+    <div style={pageBgStyle}>
+      <h1 style={{ color: titleText === "text-[#ccd0d4]" ? "#ccd0d4" : "#000" }}>Профиль</h1>
 
       <div className={`mb-6 rounded-xl border p-5 shadow-sm ${cardBg} transition-colors`}>
-        {loading ? <div className={`text-sm ${loadingText} transition-colors`}>Loading...</div> : null}
+        {loading ? <div style={pageBgStyle}>Loading...</div> : null}
         {me ? (
           <div className="flex items-center gap-4">
             <div className="relative">

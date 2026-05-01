@@ -19,7 +19,7 @@ export default function ResetPasswordPage({ isDarkTheme = false }: ResetPassword
   const [success, setSuccess] = useState(false);
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8fafc" };
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
   const brandText = isDarkTheme ? "text-purple-400" : "text-purple-700";
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
@@ -70,7 +70,7 @@ export default function ResetPasswordPage({ isDarkTheme = false }: ResetPassword
   }
 
   return (
-    <div className={`flex min-h-[calc(100vh-3rem)] items-center justify-center px-4 ${pageBg} transition-colors`}>
+    <div style={pageBgStyle} className="min-h-screen flex items-center justify-center p-4 transition-colors">
       <div className={`w-full max-w-md rounded-xl border p-8 shadow-md ${cardBg} transition-colors`}>
         <div className="mb-6 text-center">
           <div className={`text-xl font-semibold ${brandText} transition-colors`}>MTUCI Labs</div>

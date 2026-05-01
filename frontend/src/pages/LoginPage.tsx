@@ -19,7 +19,7 @@ export default function LoginPage({ isDarkTheme = false }: LoginPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8fafc" };
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
   const brandText = isDarkTheme ? "text-purple-400" : "text-purple-700";
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
@@ -55,12 +55,12 @@ export default function LoginPage({ isDarkTheme = false }: LoginPageProps) {
   }
 
   return (
-    <div className={`flex min-h-[calc(100vh-3rem)] items-center justify-center px-4 ${pageBg} transition-colors`}>
-      <div className={`w-full max-w-md rounded-xl border p-8 shadow-md ${cardBg} transition-colors`}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={pageBgStyle}>
+      <div className={`w-full max-w-md rounded-xl border p-8 shadow-md ${cardBg}`}>
         <div className="mb-6 text-center">
-          <div className={`text-xl font-semibold ${brandText} transition-colors`}>MTUCI Labs</div>
-          <h1 className={`mt-3 text-2xl font-semibold ${titleText} transition-colors`}>Вход в систему</h1>
-          <p className={`mt-1 text-sm ${subtitleText} transition-colors`}>Войдите, чтобы просматривать курсы и задания.</p>
+          <div className={`text-xl font-semibold ${brandText}`}>MTUCI Labs</div>
+          <h1 className={`mt-3 text-2xl font-semibold ${titleText}`}>Вход в систему</h1>
+          <p className={`mt-1 text-sm ${subtitleText}`}>Войдите, чтобы просматривать курсы и задания.</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">

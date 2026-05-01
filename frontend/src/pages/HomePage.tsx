@@ -113,7 +113,7 @@ export default function HomePage({ isDarkTheme = false }: HomePageProps) {
   const [coursesLoading, setCoursesLoading] = useState(true);
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8fafc" };
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-[#d4cfe6]";
   const cardBgAlt = isDarkTheme ? "bg-[#0d0d0d]" : "bg-[#faf9fd]";
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
@@ -154,10 +154,10 @@ export default function HomePage({ isDarkTheme = false }: HomePageProps) {
   const weeklyProgress = 75;
 
   return (
-    <div className={`mx-auto max-w-6xl ${pageBg} transition-colors`}>
+    <div className="min-h-screen pb-20" style={pageBgStyle}>
       {/* Приветствие */}
       <div className="mb-6">
-        <h1 className={`text-2xl font-semibold ${titleText} transition-colors`}>
+        <h1 className={`text-2xl font-semibold ${titleText}`}>
           👋 Привет, {loading ? "..." : user?.full_name || user?.email || "Иван"}!
         </h1>
       </div>

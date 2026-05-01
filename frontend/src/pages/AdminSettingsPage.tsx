@@ -7,7 +7,7 @@ interface AdminSettingsPageProps {
 
 export default function AdminSettingsPage({ isDarkTheme = false }: AdminSettingsPageProps) {
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#111111" } : { backgroundColor: "#f9fafb" };
   const pageText = isDarkTheme ? "text-white" : "text-gray-900";
   const titleColor = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-800";
   const cardBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
@@ -18,7 +18,7 @@ export default function AdminSettingsPage({ isDarkTheme = false }: AdminSettings
   const descriptionColor = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
   const footerColor = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
   return (
-    <div className={`h-full overflow-y-auto ${pageBg} ${pageText}`}>
+    <div className={`h-full overflow-y-auto ${pageText}`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 pb-20">
         <AdminPageHeader isDarkTheme={isDarkTheme} title="Настройки" />
 

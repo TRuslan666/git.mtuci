@@ -42,7 +42,7 @@ function getRoleBadge(role: User["role"], isDarkTheme: boolean) {
   const styles = {
     student: isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700",
     teacher: isDarkTheme ? "bg-purple-500/20 text-purple-400" : "bg-purple-100 text-purple-700",
-    admin: isDarkTheme ? "bg-yellow-500/20 text-yellow-400" : "bg-yellow-100 text-yellow-700",
+    admin: isDarkTheme ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700",
     laborant: isDarkTheme ? "bg-pink-500/20 text-pink-400" : "bg-pink-100 text-pink-700",
   };
   const labels = {
@@ -428,7 +428,7 @@ useEffect(() => {
   };
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const pageBgStyle = isDarkTheme ? { backgroundColor: "#0f0f10" } : { backgroundColor: "#f8fafc" };
   const textPrimary = isDarkTheme ? "text-white" : "text-slate-900";
   const cardBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-slate-200 shadow-sm";
   const cardHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-slate-50";
@@ -469,7 +469,7 @@ useEffect(() => {
   const paginationDropdownItem = isDarkTheme ? "text-[#8b949e] hover:bg-[#1f2937]" : "text-gray-600 hover:bg-gray-100";
 
   return (
-    <div className={`h-full overflow-y-auto ${pageBg} ${textPrimary} transition-colors`}>
+    <div className={`h-full overflow-y-auto ${textPrimary} transition-colors`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
         <AdminPageHeader
