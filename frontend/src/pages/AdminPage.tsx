@@ -187,36 +187,36 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
         const newNotifications: Notification[] = [];
         
         // Check disk usage
-        if (sysMetrics.disk_usage >= 85) {
+        if (sysMetrics.disk_percent >= 85) {
           newNotifications.push({
             id: `disk-${Date.now()}`,
-            type: sysMetrics.disk_usage >= 95 ? 'critical' : 'warning',
+            type: sysMetrics.disk_percent >= 95 ? 'critical' : 'warning',
             title: 'Диск переполнен',
-            message: `Использовано ${sysMetrics.disk_usage}% дискового пространства`,
+            message: `Использовано ${sysMetrics.disk_percent}% дискового пространства`,
             timestamp: 'только что',
             category: 'server',
           });
         }
         
         // Check memory usage
-        if (sysMetrics.memory_usage >= 90) {
+        if (sysMetrics.memory_percent >= 90) {
           newNotifications.push({
             id: `mem-${Date.now()}`,
             type: 'critical',
             title: 'Высокая загрузка RAM',
-            message: `Использовано ${sysMetrics.memory_usage}% оперативной памяти`,
+            message: `Использовано ${sysMetrics.memory_percent}% оперативной памяти`,
             timestamp: 'только что',
             category: 'server',
           });
         }
         
         // Check CPU usage
-        if (sysMetrics.cpu_usage >= 95) {
+        if (sysMetrics.cpu_percent >= 95) {
           newNotifications.push({
             id: `cpu-${Date.now()}`,
             type: 'warning',
             title: 'Высокая загрузка CPU',
-            message: `CPU загружен на ${sysMetrics.cpu_usage}%`,
+            message: `CPU загружен на ${sysMetrics.cpu_percent}%`,
             timestamp: 'только что',
             category: 'server',
           });
