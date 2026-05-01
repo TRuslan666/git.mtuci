@@ -32,6 +32,7 @@ import {
   type AuditLog
 } from "../api/rolesApi";
 import toast from "react-hot-toast";
+import AdminPageHeader from "../components/AdminPageHeader";
 
 type RoleType = "admin" | "teacher" | "student" | "laborant";
 type PermissionLevel = "read" | "write" | "delete" | "none";
@@ -80,12 +81,12 @@ const iconMap: Record<string, React.ElementType> = {
   Settings,
 };
 
-function getLevelBadge(level: PermissionLevel) {
+function getLevelBadge(level: PermissionLevel, isDarkTheme: boolean) {
   const styles = {
-    read: "bg-blue-500/20 text-blue-400",
-    write: "bg-white text-gray-900",
-    delete: "bg-red-500/20 text-red-400",
-    none: "bg-gray-700 text-gray-400",
+    read: isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700",
+    write: isDarkTheme ? "bg-[#252525] text-[#ccd0d4]" : "bg-white text-gray-900",
+    delete: isDarkTheme ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700",
+    none: isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681]" : "bg-gray-200 text-gray-500",
   };
   const labels = {
     read: "Чтение",
@@ -100,12 +101,12 @@ function getLevelBadge(level: PermissionLevel) {
   );
 }
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function Toggle({ checked, onChange, disabled, isDarkTheme }: { checked: boolean; onChange: () => void; disabled?: boolean; isDarkTheme?: boolean }) {
   return (
     <button
       onClick={onChange}
       disabled={disabled}
-      className={`relative w-11 h-6 rounded-full transition-colors ${checked ? "bg-blue-600" : "bg-gray-700"} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      className={`relative w-11 h-6 rounded-full transition-colors ${checked ? "bg-blue-600" : isDarkTheme ? "bg-[#2d2d2d]" : "bg-gray-300"} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
       <span
         className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`}
@@ -314,18 +315,38 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
   const pageBg = isDarkTheme ? "bg-[#111111] text-white" : "bg-[#f8f9fa] text-gray-900";
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
   const cardBgLight = isDarkTheme ? "bg-[#252525]" : "bg-gray-100";
+  const cardBgLighter = isDarkTheme ? "bg-[#1e1e1e]" : "bg-white";
   const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
   const textSecondary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
   const textTertiary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const roleCardText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const roleCardDesc = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const roleCardCount = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const headerText = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const activeBadge = isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700";
+  const systemBadge = isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681]" : "bg-gray-200 text-gray-500";
+  const dividerColor = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const hoverBg = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-100";
+  const resetBtn = isDarkTheme ? "bg-[#252525] border-[#2d2d2d] text-[#8b949e] hover:text-white" : "bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-900";
+  const saveBtnActive = "bg-blue-600 text-white hover:bg-blue-700";
+  const saveBtnInactive = isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681] cursor-not-allowed" : "bg-gray-300 text-gray-500 cursor-not-allowed";
+  const sectionHeader = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const assistantCard = isDarkTheme ? "bg-[#1e1e1e] border-[#30363d]" : "bg-white border-gray-200";
+  const assistantHeader = isDarkTheme ? "bg-[#252525]" : "bg-gray-50";
+  const trustedText = isDarkTheme ? "text-emerald-400" : "text-emerald-600";
+  const untrustedText = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const auditCard = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const auditTag = isDarkTheme ? "bg-[#252525] text-[#8b949e]" : "bg-gray-100 text-gray-600";
 
   return (
     <div className={`h-full overflow-y-auto ${pageBg}`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Роли и доступ</h1>
-          <span className={`text-sm ${textSecondary}`}>{roles.length} ролей</span>
-        </div>
+        <AdminPageHeader
+          isDarkTheme={isDarkTheme}
+          title="Роли и доступ"
+          subtitle={`${roles.length} ролей`}
+        />
 
         {/* Role Cards */}
         <div className="grid grid-cols-5 gap-4">
@@ -336,18 +357,18 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
               <button
                 key={role.id}
                 onClick={() => handleRoleChange(role.id as RoleType)}
-                className={`text-left p-5 rounded-xl bg-[#161616] border transition-all ${
+                className={`text-left p-5 rounded-xl border transition-all ${cardBg} ${
                   isActive
                     ? "border-blue-500/50 shadow-lg shadow-blue-500/10"
-                    : "border-[#2d2d2d] hover:border-[#3d3d3d]"
+                    : isDarkTheme ? "hover:border-[#3d3d3d]" : "hover:border-gray-300"
                 }`}
               >
                 <div className={`w-10 h-10 rounded-lg ${role.icon_bg} flex items-center justify-center mb-3`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-base font-semibold text-[#ccd0d4] mb-1">{role.name}</h3>
-                <p className="text-xs text-[#6e7681] mb-3 line-clamp-2">{role.description}</p>
-                <p className="text-sm text-[#8b949e]">{role.user_count} {pluralizeUsers(role.user_count)}</p>
+                <h3 className={`text-base font-semibold mb-1 ${roleCardText}`}>{role.name}</h3>
+                <p className={`text-xs mb-3 line-clamp-2 ${roleCardDesc}`}>{role.description}</p>
+                <p className={`text-sm ${roleCardCount}`}>{role.user_count} {pluralizeUsers(role.user_count)}</p>
               </button>
             );
           })}
@@ -356,8 +377,8 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
         {/* Split Screen */}
         <div className="grid grid-cols-[35%_1fr] gap-6">
           {/* Left Column - Role Selection */}
-          <div className="bg-[#161616] rounded-xl border border-[#2d2d2d] p-5">
-            <h2 className="text-sm font-semibold text-[#6e7681] uppercase tracking-wider mb-4">
+          <div className={`rounded-xl border p-5 ${cardBg}`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wider mb-4 ${headerText}`}>
               Выбрать роль для редактирования
             </h2>
             <div className="space-y-2">
@@ -377,14 +398,14 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                     </div>
                     <div className="flex-1 text-left">
                       <p className={`text-sm font-medium ${textPrimary}`}>{role.name}</p>
-                      <p className="text-xs text-gray-500">{role.user_count} {pluralizeUsers(role.user_count)}</p>
+                      <p className={`text-xs ${textSecondary}`}>{role.user_count} {pluralizeUsers(role.user_count)}</p>
                     </div>
                     {isSelected ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${activeBadge}`}>
                         Выбрана
                       </span>
                     ) : role.is_system ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${systemBadge}`}>
                         Системная
                       </span>
                     ) : null}
@@ -399,14 +420,14 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <h2 className={`text-lg font-semibold ${textPrimary}`}>{currentRole?.name || "Роль"}</h2>
-                <span className="text-gray-500">—</span>
-                <span className="text-gray-400">права доступа</span>
+                <span className={textSecondary}>—</span>
+                <span className={textTertiary}>права доступа</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleReset}
                   disabled={permissionsLoading || (!hasChanges && categories.length > 0)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${isDarkTheme ? "bg-[#252525] border-[#2d2d2d] text-gray-400 hover:text-white" : "bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-900"}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${resetBtn}`}
                 >
                   <RotateCcw className="h-4 w-4" />
                   Сбросить
@@ -415,9 +436,7 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                   onClick={handleSave}
                   disabled={permissionsLoading || !hasChanges}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-                    hasChanges
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : isDarkTheme ? "bg-gray-700 text-gray-400 cursor-not-allowed" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    hasChanges ? saveBtnActive : saveBtnInactive
                   }`}
                 >
                   <Save className="h-4 w-4" />
@@ -431,10 +450,10 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                 const CategoryIcon = category.icon;
                 return (
                   <div key={category.title}>
-                    {categoryIndex > 0 && <div className="border-t border-[#2d2d2d] mb-6" />}
+                    {categoryIndex > 0 && <div className={`border-t mb-6 ${dividerColor}`} />}
                     <div className="flex items-center gap-2 mb-4">
-                      <CategoryIcon className="h-4 w-4 text-gray-500" />
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <CategoryIcon className={`h-4 w-4 ${sectionHeader}`} />
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider ${sectionHeader}`}>
                         {category.title}
                       </h3>
                     </div>
@@ -446,13 +465,14 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                         >
                           <div className="flex-1">
                             <p className={`text-sm font-medium ${textPrimary}`}>{permission.name}</p>
-                            <p className="text-xs text-gray-500">{permission.description}</p>
+                            <p className={`text-xs ${textSecondary}`}>{permission.description}</p>
                           </div>
                           <div className="flex items-center gap-3">
-                            {getLevelBadge(permission.level)}
+                            {getLevelBadge(permission.level, isDarkTheme)}
                             <Toggle
                               checked={permission.enabled}
                               onChange={() => togglePermission(categoryIndex, permissionIndex)}
+                              isDarkTheme={isDarkTheme}
                             />
                           </div>
                         </div>
@@ -465,22 +485,22 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
               {/* Audit Logs - Only for Admin */}
               {currentRole?.id === "admin" && (
                 <>
-                  <div className="border-t border-[#2d2d2d] mb-6" />
+                  <div className={`border-t mb-6 ${dividerColor}`} />
                   <div className="space-y-4">
                     <button
                       onClick={() => setShowAuditLogs(!showAuditLogs)}
-                      className="flex items-center justify-between w-full p-3 rounded-lg bg-gray-50 dark:bg-[#252525] hover:bg-gray-100 dark:hover:bg-[#2d2d2d] transition-colors"
+                      className={`flex items-center justify-between w-full p-3 rounded-lg transition-colors ${cardBgLight} ${hoverBg}`}
                     >
                       <div className="flex items-center gap-2">
-                        <History className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        <History className={`h-4 w-4 ${sectionHeader}`} />
+                        <span className={`text-sm font-medium ${textPrimary}`}>
                           История изменений прав
                         </span>
                       </div>
                       {showAuditLogs ? (
-                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                        <ChevronUp className={`h-4 w-4 ${textSecondary}`} />
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                        <ChevronDown className={`h-4 w-4 ${textSecondary}`} />
                       )}
                     </button>
 
@@ -488,31 +508,31 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {auditLoading ? (
                           <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                            <Loader2 className={`h-5 w-5 animate-spin ${textSecondary}`} />
                           </div>
                         ) : auditLogs.length === 0 ? (
-                          <p className="text-sm text-gray-500 text-center py-4">
+                          <p className={`text-sm text-center py-4 ${textSecondary}`}>
                             Нет записей для этой роли
                           </p>
                         ) : (
                           auditLogs.map((log) => (
                             <div
                               key={log.id}
-                              className="p-3 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-[#2d2d2d]"
+                              className={`p-3 rounded-lg border ${auditCard}`}
                             >
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                <span className={`text-sm font-medium ${textPrimary}`}>
                                   {log.actor_name}
                                 </span>
-                                <span className="text-xs text-gray-500">
+                                <span className={`text-xs ${textSecondary}`}>
                                   {new Date(log.created_at).toLocaleString("ru-RU")}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400">
+                                <span className={`px-2 py-0.5 rounded ${auditTag}`}>
                                   {log.target_role}
                                 </span>
-                                <span className="text-gray-500">
+                                <span className={textSecondary}>
                                   {log.action === "save_batch" ? "изменил права" :
                                    log.action === "reset" ? "сбросил права" : log.action}
                                 </span>
@@ -529,52 +549,54 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
               {/* Assistant Management - Only for Teacher role */}
               {selectedRole === "teacher" && (
                 <>
-                  <div className="border-t border-[#2d2d2d] mb-6" />
+                  <div className={`border-t mb-6 ${dividerColor}`} />
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-4">
-                      <Users className="h-4 w-4 text-gray-500" />
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <Users className={`h-4 w-4 ${sectionHeader}`} />
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider ${sectionHeader}`}>
                         УПРАВЛЕНИЕ АССИСТЕНТАМИ
                       </h3>
                     </div>
 
-                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#252525]">
+                    <div className={`p-4 rounded-lg ${assistantHeader}`}>
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">Разрешить лаборантам проверку моих курсов</p>
-                          <p className="text-xs text-gray-500">Доверенные лаборанты смогут выставлять оценки</p>
+                          <p className={`text-sm font-medium ${textPrimary}`}>Разрешить лаборантам проверку моих курсов</p>
+                          <p className={`text-xs ${textSecondary}`}>Доверенные лаборанты смогут выставлять оценки</p>
                         </div>
                         <Toggle
                           checked={allowAssistantGrading}
                           onChange={() => setAllowAssistantGrading(!allowAssistantGrading)}
+                          isDarkTheme={isDarkTheme}
                         />
                       </div>
 
                       {allowAssistantGrading && (
-                        <div className="mt-4 pt-4 border-t border-[#2d2d2d]">
-                          <p className="text-xs text-gray-400 mb-3">
+                        <div className={`mt-4 pt-4 border-t ${dividerColor}`}>
+                          <p className={`text-xs mb-3 ${textTertiary}`}>
                             Только выбранные лаборанты смогут выставлять оценки и менять статусы работ в ваших курсах
                           </p>
                           <div className="space-y-2">
                             {assistants.map((assistant) => (
                               <div
                                 key={assistant.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-transparent"
+                                className={`flex items-center justify-between p-3 rounded-lg border ${assistantCard}`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                    <span className="text-xs font-medium text-emerald-400">{assistant.initials}</span>
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkTheme ? "bg-emerald-500/20" : "bg-emerald-100"}`}>
+                                    <span className={`text-xs font-medium ${isDarkTheme ? "text-emerald-400" : "text-emerald-600"}`}>{assistant.initials}</span>
                                   </div>
-                                  <span className="text-sm text-gray-900 dark:text-white">{assistant.name}</span>
+                                  <span className={`text-sm ${textPrimary}`}>{assistant.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className={`text-xs ${assistant.trusted ? "text-emerald-400" : "text-gray-500"}`}>
+                                  <span className={`text-xs ${assistant.trusted ? trustedText : untrustedText}`}>
                                     {assistant.trusted ? "Доверенный" : "Не доверенный"}
                                   </span>
                                   <Toggle
                                     checked={assistant.trusted}
                                     onChange={() => toggleAssistantTrust(assistant.id)}
                                     disabled={togglingId === assistant.id}
+                                    isDarkTheme={isDarkTheme}
                                   />
                                 </div>
                               </div>

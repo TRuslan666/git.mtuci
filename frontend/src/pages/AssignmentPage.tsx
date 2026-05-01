@@ -33,6 +33,10 @@ type ViewState = {
 
 type AssignmentTab = "commits" | "files" | "grading" | "plagiarism";
 
+interface AssignmentPageProps {
+  isDarkTheme?: boolean;
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "";
   const d = new Date(value);
@@ -47,7 +51,40 @@ function getInitials(fullName: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-export default function AssignmentPage() {
+export default function AssignmentPage({ isDarkTheme = true }: AssignmentPageProps) {
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const cardBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const cardBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const textSecondary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const textTertiary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const inputBg = isDarkTheme ? "bg-[#1f2937]" : "bg-white";
+  const inputBorder = isDarkTheme ? "border-[#30363d]" : "border-gray-300";
+  const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
+  const tabActiveBg = isDarkTheme ? "bg-purple-900/30 border-purple-700 text-purple-300" : "bg-purple-100 border-purple-200 text-purple-700";
+  const tabInactiveBg = isDarkTheme ? "bg-[#1f2937] border-[#30363d] text-gray-300 hover:border-purple-700 hover:text-purple-300" : "bg-white border-gray-200 text-gray-700 hover:border-purple-200 hover:text-purple-700";
+  const buttonPrimary = isDarkTheme ? "bg-purple-600 hover:bg-purple-500 text-white" : "bg-purple-600 hover:bg-purple-700 text-white";
+  const breadcrumbText = isDarkTheme ? "text-purple-400" : "text-purple-700";
+  const breadcrumbHover = isDarkTheme ? "hover:text-purple-300" : "hover:text-purple-800";
+  const separatorColor = isDarkTheme ? "text-[#484f58]" : "text-gray-400";
+  const deadlineBadge = isDarkTheme ? "bg-purple-900/30 text-purple-300" : "bg-purple-50 text-purple-700";
+  const penaltyBox = isDarkTheme ? "bg-[#1f2937] border-[#30363d]" : "bg-gray-50 border-gray-200";
+  const errorBox = isDarkTheme ? "bg-red-900/20 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-800";
+  const successBox = isDarkTheme ? "bg-green-900/20 text-green-300" : "bg-green-50 text-green-700";
+  const codeHeader = isDarkTheme ? "bg-[#1f2937] border-[#30363d] text-[#ccd0d4]" : "bg-gray-50 border-gray-200 text-gray-800";
+  const codeLineNum = isDarkTheme ? "border-r-[#30363d] text-[#6e7681]" : "border-r border-gray-100 text-gray-500";
+  const timelineDot = isDarkTheme ? "bg-purple-500" : "bg-purple-500";
+  const timelineLine = isDarkTheme ? "bg-purple-800" : "bg-purple-100";
+  const commitCard = isDarkTheme ? "bg-[#1f2937] border-[#30363d]" : "bg-gray-50 border-gray-100";
+  const commitHash = isDarkTheme ? "text-purple-400" : "text-purple-700";
+  const modalOverlay = isDarkTheme ? "bg-black/60" : "bg-black/40";
+  const modalBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const avatarBg = isDarkTheme ? "bg-indigo-900/30 text-indigo-300" : "bg-indigo-100 text-indigo-700";
+  const gaugeBg = isDarkTheme ? "#30363d" : "#e5e7eb";
+  const similarityHigh = isDarkTheme ? "bg-red-900/30 text-red-300" : "bg-red-100 text-red-800";
+  const similarityMedium = isDarkTheme ? "bg-yellow-900/30 text-yellow-300" : "bg-yellow-100 text-yellow-800";
+  const similarityLow = isDarkTheme ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-800";
   const { courseId, assignmentId } = useParams();
 
   const [loading, setLoading] = useState(true);
@@ -326,62 +363,62 @@ export default function AssignmentPage() {
   function tabButtonClass(tab: AssignmentTab) {
     const base = "rounded-lg border px-3 py-2 text-sm font-medium transition";
     if (tab === activeTab) {
-      return `${base} border-purple-200 bg-purple-100 text-purple-700`;
+      return `${base} ${tabActiveBg}`;
     }
-    return `${base} border-gray-200 bg-white text-gray-700 hover:border-purple-200 hover:text-purple-700`;
+    return `${base} ${tabInactiveBg}`;
   }
 
   if (!courseId || !assignmentId) return null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4">
-      <div className="mb-3 text-sm text-gray-600">
-        <Link to="/courses" className="text-purple-700 hover:text-purple-800">
+    <div className={`mx-auto max-w-7xl px-4 ${pageBg} min-h-screen py-4`}>
+      <div className={`mb-3 text-sm ${textSecondary}`}>
+        <Link to="/courses" className={`${breadcrumbText} ${breadcrumbHover}`}>
           Курсы
         </Link>
-        <span className="mx-2 text-gray-400">&gt;</span>
-        <Link to={`/courses/${courseId}`} className="text-purple-700 hover:text-purple-800">
+        <span className={`mx-2 ${separatorColor}`}>&gt;</span>
+        <Link to={`/courses/${courseId}`} className={`${breadcrumbText} ${breadcrumbHover}`}>
           {course?.title || "Курс"}
         </Link>
-        <span className="mx-2 text-gray-400">&gt;</span>
-        <span className="font-medium text-gray-800">{headerTitle}</span>
+        <span className={`mx-2 ${separatorColor}`}>&gt;</span>
+        <span className={`font-medium ${textPrimary}`}>{headerTitle}</span>
       </div>
 
-      <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5 shadow-md">
-        <h1 className="text-3xl font-semibold text-gray-900">{headerTitle}</h1>
-        {assignment?.description ? <div className="mt-2 text-sm text-gray-700">{assignment.description}</div> : null}
+      <div className={`mb-5 rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}>
+        <h1 className={`text-3xl font-semibold ${textPrimary}`}>{headerTitle}</h1>
+        {assignment?.description ? <div className={`mt-2 text-sm ${textSecondary}`}>{assignment.description}</div> : null}
         {assignment?.deadline ? (
-          <div className="mt-3 inline-flex rounded-full bg-purple-50 px-3 py-1 text-sm text-purple-700">
+          <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm ${deadlineBadge}`}>
             Deadline: <span className="ml-1 font-medium">{formatDate(assignment.deadline)}</span>
           </div>
         ) : null}
         {assignment && assignment.late_penalty_periods.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-            <div className="mb-1 font-medium text-gray-700">Штрафы за просрочку</div>
+          <div className={`mt-3 rounded-lg border ${penaltyBox} p-3 text-sm`}>
+            <div className={`mb-1 font-medium ${textPrimary}`}>Штрафы за просрочку</div>
             {sortedPenaltyPeriods.map((p, idx) => (
-                <div key={`${p.weeks}-${idx}`} className="text-gray-600">
+                <div key={`${p.weeks}-${idx}`} className={textSecondary}>
                   До {p.weeks} недели → макс. {p.max_grade}
                 </div>
               ))}
-            <div className="text-gray-700">Позже → макс. 0</div>
+            <div className={textPrimary}>Позже → макс. 0</div>
           </div>
         ) : null}
       </div>
 
-      {loading ? <div className="text-sm text-gray-600">Loading...</div> : null}
+      {loading ? <div className={`text-sm ${textSecondary}`}>Loading...</div> : null}
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
           {error}
         </div>
       ) : null}
 
       {me?.role === "teacher" ? (
-        <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-md">
-          <div className="mb-2 text-sm font-semibold">Репозиторий студента для просмотра файлов и коммитов</div>
+        <div className={`mb-4 rounded-xl border ${cardBorder} ${cardBg} p-4 shadow-md`}>
+          <div className={`mb-2 text-sm font-semibold ${textPrimary}`}>Репозиторий студента для просмотра файлов и коммитов</div>
           <select
             value={selectedRepoStudentId}
             onChange={(e) => setSelectedRepoStudentId(e.target.value)}
-            className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+            className={`w-full max-w-md rounded-lg border ${inputBorder} px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
           >
             <option value="">Выберите студента</option>
             {submissions.map((s) => (
@@ -415,43 +452,43 @@ export default function AssignmentPage() {
       </div>
 
       {activeTab === "commits" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-md">
-          <div className="mb-3 text-lg font-semibold text-gray-900">Commits timeline</div>
+        <div className={`rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}>
+          <div className={`mb-3 text-lg font-semibold ${textPrimary}`}>Commits timeline</div>
           <div className="space-y-4">
             {commits.map((c) => (
               <div key={c.sha} className="relative pl-6">
-                <div className="absolute left-0 top-1 h-3 w-3 rounded-full bg-purple-500" />
-                <div className="absolute left-[5px] top-5 h-[calc(100%-10px)] w-[2px] bg-purple-100" />
-                <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                  <div className="text-sm font-mono text-purple-700">{c.sha.slice(0, 7)}</div>
-                  <div className="mt-1 text-sm font-medium">{c.message}</div>
-                  <div className="mt-1 text-xs text-gray-600">
+                <div className={`absolute left-0 top-1 h-3 w-3 rounded-full ${timelineDot}`} />
+                <div className={`absolute left-[5px] top-5 h-[calc(100%-10px)] w-[2px] ${timelineLine}`} />
+                <div className={`rounded-lg border ${commitCard} p-3`}>
+                  <div className={`text-sm font-mono ${commitHash}`}>{c.sha.slice(0, 7)}</div>
+                  <div className={`mt-1 text-sm font-medium ${textPrimary}`}>{c.message}</div>
+                  <div className={`mt-1 text-xs ${textSecondary}`}>
                     {c.author.name}
                     {c.author.email ? ` (${c.author.email})` : ""}
                   </div>
-                  <div className="mt-1 text-xs text-gray-600">{formatDate(c.date)}</div>
+                  <div className={`mt-1 text-xs ${textTertiary}`}>{formatDate(c.date)}</div>
                 </div>
               </div>
             ))}
-            {!loading && commits.length === 0 ? <div className="text-sm text-gray-600">No commits found.</div> : null}
+            {!loading && commits.length === 0 ? <div className={`text-sm ${textSecondary}`}>No commits found.</div> : null}
           </div>
         </div>
       ) : null}
 
       {activeTab === "files" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-md">
-          <div className="mb-3 text-lg font-semibold text-gray-900">Файлы (дерево)</div>
+        <div className={`rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}>
+          <div className={`mb-3 text-lg font-semibold ${textPrimary}`}>Файлы (дерево)</div>
           <div className="space-y-2">
             {sortedFiles.map((f) => (
                 <div
                   key={`${f.type}:${f.sha}:${f.name}`}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-3"
+                  className={`flex items-center justify-between rounded-lg border ${commitCard} p-3`}
                 >
                   <div className="min-w-0" style={{ paddingLeft: `${(f.name.match(/\//g)?.length ?? 0) * 14}px` }}>
-                    <div className="truncate text-sm font-medium">
+                    <div className={`truncate text-sm font-medium ${textPrimary}`}>
                       {f.type === "dir" ? "📁" : "📄"} {f.name}
                     </div>
-                    <div className="mt-1 text-xs text-gray-600">
+                    <div className={`mt-1 text-xs ${textSecondary}`}>
                       {f.type === "dir" ? "dir" : "file"}{" "}
                       {f.size !== null && f.type === "file" ? `(${f.size} bytes)` : ""}
                     </div>
@@ -459,32 +496,32 @@ export default function AssignmentPage() {
                   {f.type === "file" ? (
                     <button
                       onClick={() => onViewFile(f)}
-                      className="rounded-lg bg-purple-600 px-3 py-1 text-sm text-white transition hover:bg-purple-700"
+                      className={`rounded-lg px-3 py-1 text-sm transition ${buttonPrimary}`}
                     >
                       View
                     </button>
                   ) : (
-                    <div className="text-xs text-gray-400">—</div>
+                    <div className={`text-xs ${textTertiary}`}>—</div>
                   )}
                 </div>
               ))}
 
-            {!loading && files.length === 0 ? <div className="text-sm text-gray-600">No files found.</div> : null}
+            {!loading && files.length === 0 ? <div className={`text-sm ${textSecondary}`}>No files found.</div> : null}
           </div>
         </div>
       ) : null}
 
       {me?.role === "teacher" && activeTab === "plagiarism" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-md">
+        <div className={`rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-lg font-semibold">AI антиплагиат</div>
+            <div className={`text-lg font-semibold ${textPrimary}`}>AI антиплагиат</div>
           </div>
 
           <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
             <select
               value={selectedStudent1Id}
               onChange={(e) => setSelectedStudent1Id(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className={`w-full rounded-md border ${inputBorder} px-3 py-2 text-sm ${inputBg} ${textPrimary}`}
             >
               <option value="">Студент 1</option>
               {submissions.map((s) => (
@@ -496,7 +533,7 @@ export default function AssignmentPage() {
             <select
               value={selectedStudent2Id}
               onChange={(e) => setSelectedStudent2Id(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className={`w-full rounded-md border ${inputBorder} px-3 py-2 text-sm ${inputBg} ${textPrimary}`}
             >
               <option value="">Студент 2</option>
               {submissions.map((s) => (
@@ -509,40 +546,40 @@ export default function AssignmentPage() {
               type="button"
               onClick={onComparePlagiarism}
               disabled={plagiarismLoading || submissions.length < 2}
-              className="rounded-lg bg-purple-600 px-3 py-2 text-sm text-white transition hover:bg-purple-700 disabled:opacity-60"
+              className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-60 ${buttonPrimary}`}
             >
               {plagiarismLoading ? "Сравнение..." : "Сравнить"}
             </button>
           </div>
 
           {plagiarismError ? (
-            <div className="mb-3 mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className={`mb-3 mt-3 rounded-md border p-3 text-sm ${errorBox}`}>
               {plagiarismError}
             </div>
           ) : null}
 
           {plagiarism ? (
-            <div className="mb-4 mt-3 rounded-md border border-gray-200 p-3">
+            <div className={`mb-4 mt-3 rounded-md border ${cardBorder} ${cardBg} p-3`}>
               <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-                <div className="flex flex-col items-center justify-center rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div className={`flex flex-col items-center justify-center rounded-lg border ${commitCard} p-4`}>
                   <div
                     className="relative h-40 w-40 rounded-full"
                     style={{
                       background: `conic-gradient(${gaugeColor(plagiarism.similarity)} ${
                         plagiarism.similarity * 360
-                      }deg, #e5e7eb 0deg)`,
+                      }deg, ${gaugeBg} 0deg)`,
                     }}
                   >
-                    <div className="absolute inset-4 flex items-center justify-center rounded-full bg-white">
+                    <div className={`absolute inset-4 flex items-center justify-center rounded-full ${cardBg}`}>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">
+                        <div className={`text-3xl font-bold ${textPrimary}`}>
                           {(plagiarism.similarity * 100).toFixed(1)}%
                         </div>
-                        <div className="text-xs text-gray-500">Similarity</div>
+                        <div className={`text-xs ${textTertiary}`}>Similarity</div>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 text-sm text-gray-700">
+                  <div className={`mt-3 text-sm ${textSecondary}`}>
                     Вердикт:{" "}
                     <span className={`rounded px-2 py-0.5 text-xs ${verdictClass(plagiarism.verdict)}`}>
                       {plagiarism.verdict}
@@ -552,32 +589,32 @@ export default function AssignmentPage() {
 
                 <div className="space-y-4">
                   <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                    <div className={`rounded-lg border ${cardBorder} ${cardBg} p-3`}>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${avatarBg}`}>
                           {getInitials(selectedStudent1?.student_full_name ?? "S1")}
                         </div>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-gray-900">
+                          <div className={`truncate text-sm font-semibold ${textPrimary}`}>
                             {selectedStudent1?.student_full_name ?? "Студент 1"}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <div className={`flex items-center gap-2 text-sm font-semibold ${textSecondary}`}>
                       <span>→</span>
                       <span>{(plagiarism.similarity * 100).toFixed(1)}%</span>
                       <span>→</span>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                    <div className={`rounded-lg border ${cardBorder} ${cardBg} p-3`}>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${avatarBg}`}>
                           {getInitials(selectedStudent2?.student_full_name ?? "S2")}
                         </div>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-gray-900">
+                          <div className={`truncate text-sm font-semibold ${textPrimary}`}>
                             {selectedStudent2?.student_full_name ?? "Студент 2"}
                           </div>
                         </div>
@@ -586,7 +623,7 @@ export default function AssignmentPage() {
                   </div>
 
                   <div>
-                    <div className="text-sm font-semibold text-gray-800">Совпадающие AST элементы</div>
+                    <div className={`text-sm font-semibold ${textPrimary}`}>Совпадающие AST элементы</div>
                     {plagiarism.common_features.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {plagiarism.common_features.map((feature) => (
@@ -599,55 +636,55 @@ export default function AssignmentPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-2 text-sm text-gray-600">Совпадающих AST элементов не найдено.</div>
+                      <div className={`mt-2 text-sm ${textSecondary}`}>Совпадающих AST элементов не найдено.</div>
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-gray-200 bg-white p-3">
+                  <div className={`rounded-lg border ${cardBorder} ${cardBg} p-3`}>
                     <div className="mb-3 grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-                      <div className="text-sm font-semibold text-gray-800">
+                      <div className={`text-sm font-semibold ${textPrimary}`}>
                         {selectedStudent1?.student_full_name ?? "Студент 1"}
                       </div>
-                      <div className="text-center text-xs font-semibold text-gray-600">
+                      <div className={`text-center text-xs font-semibold ${textSecondary}`}>
                         {(plagiarism.similarity * 100).toFixed(1)}%
                       </div>
-                      <div className="text-right text-sm font-semibold text-gray-800">
+                      <div className={`text-right text-sm font-semibold ${textPrimary}`}>
                         {selectedStudent2?.student_full_name ?? "Студент 2"}
                       </div>
                     </div>
                     <div className="grid gap-3 lg:grid-cols-2">
-                      <div className="overflow-hidden rounded-md border border-gray-200">
-                        <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                      <div className={`overflow-hidden rounded-md border ${cardBorder}`}>
+                        <div className={`border-b px-3 py-2 text-sm font-semibold ${codeHeader}`}>
                           {selectedStudent1?.student_full_name ?? "Студент 1"}
                         </div>
-                        <div className="max-h-[420px] overflow-auto font-mono text-xs">
+                        <div className={`max-h-[420px] overflow-auto font-mono text-xs ${inputBg}`}>
                           {plagiarism.lines1.map((row, idx) => (
                             <div
                               key={`l1-${idx}`}
                               className={`grid grid-cols-[48px_1fr] ${lineStatusClass(row.status)}`}
                             >
-                              <div className="border-r border-gray-100 px-2 py-1 text-right text-gray-500">
+                              <div className={`border-r px-2 py-1 text-right ${codeLineNum}`}>
                                 {idx + 1}
                               </div>
-                              <div className="px-2 py-1 whitespace-pre">{row.line || " "}</div>
+                              <div className={`px-2 py-1 whitespace-pre ${textPrimary}`}>{row.line || " "}</div>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div className="overflow-hidden rounded-md border border-gray-200">
-                        <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                      <div className={`overflow-hidden rounded-md border ${cardBorder}`}>
+                        <div className={`border-b px-3 py-2 text-sm font-semibold ${codeHeader}`}>
                           {selectedStudent2?.student_full_name ?? "Студент 2"}
                         </div>
-                        <div className="max-h-[420px] overflow-auto font-mono text-xs">
+                        <div className={`max-h-[420px] overflow-auto font-mono text-xs ${inputBg}`}>
                           {plagiarism.lines2.map((row, idx) => (
                             <div
                               key={`l2-${idx}`}
                               className={`grid grid-cols-[48px_1fr] ${lineStatusClass(row.status)}`}
                             >
-                              <div className="border-r border-gray-100 px-2 py-1 text-right text-gray-500">
+                              <div className={`border-r px-2 py-1 text-right ${codeLineNum}`}>
                                 {idx + 1}
                               </div>
-                              <div className="px-2 py-1 whitespace-pre">{row.line || " "}</div>
+                              <div className={`px-2 py-1 whitespace-pre ${textPrimary}`}>{row.line || " "}</div>
                             </div>
                           ))}
                         </div>
@@ -663,33 +700,33 @@ export default function AssignmentPage() {
       ) : null}
 
       {me?.role === "teacher" && activeTab === "grading" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-md">
-          <div className="mb-3 text-lg font-semibold">Оценивание студентов</div>
-          {submissionsLoading ? <div className="text-sm text-gray-600">Loading submissions...</div> : null}
+        <div className={`rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}>
+          <div className={`mb-3 text-lg font-semibold ${textPrimary}`}>Оценивание студентов</div>
+          {submissionsLoading ? <div className={`text-sm ${textSecondary}`}>Loading submissions...</div> : null}
           {submissionsError ? (
-            <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className={`mb-3 rounded-md border p-3 text-sm ${errorBox}`}>
               {submissionsError}
             </div>
           ) : null}
 
           <div className="space-y-3">
             {submissions.map((s) => (
-              <div key={s.student_id} className="rounded-md border border-gray-100 p-3">
+              <div key={s.student_id} className={`rounded-md border ${cardBorder} ${cardBg} p-3`}>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="text-sm font-semibold">{s.student_full_name}</div>
+                  <div className={`text-sm font-semibold ${textPrimary}`}>{s.student_full_name}</div>
                   <div
                     className={`rounded px-2 py-0.5 text-xs ${
-                      s.status === "submitted" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"
+                      s.status === "submitted" ? (isDarkTheme ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-800") : (isDarkTheme ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700")
                     }`}
                   >
                     {s.status === "submitted" ? "Сдано" : "Не сдано"}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className={`text-xs ${textTertiary}`}>
                     Последний коммит: {s.last_commit_at ? formatDate(s.last_commit_at) : "—"}
                   </div>
                 </div>
 
-                <div className="mt-3 text-xs text-gray-600">Оценка (0 — {course?.grade_max ?? 100})</div>
+                <div className={`mt-3 text-xs ${textTertiary}`}>Оценка (0 — {course?.grade_max ?? 100})</div>
                 <div className="mt-1 grid gap-2 md:grid-cols-[140px_1fr_auto]">
                   <input
                     type="number"
@@ -704,7 +741,7 @@ export default function AssignmentPage() {
                       }))
                     }
                     placeholder={`0 — ${course?.grade_max ?? 100}`}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full rounded-lg border ${inputBorder} px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                   />
                   <input
                     type="text"
@@ -716,19 +753,19 @@ export default function AssignmentPage() {
                       }))
                     }
                     placeholder="Комментарий"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full rounded-lg border ${inputBorder} px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                   />
                   <button
                     type="button"
                     onClick={() => onSaveGrade(s.student_id)}
                     disabled={savingGradeFor === s.student_id}
-                    className="rounded-lg bg-purple-600 px-3 py-2 text-sm text-white transition hover:bg-purple-700 disabled:opacity-60"
+                    className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-60 ${buttonPrimary}`}
                   >
                     {savingGradeFor === s.student_id ? "Сохранение..." : "Сохранить"}
                   </button>
                 </div>
 
-                <div className="mt-2 text-xs text-gray-600">
+                <div className={`mt-2 text-xs ${textTertiary}`}>
                   Оригинальная: {s.grade ?? "—"} | Штраф: -{(s.penalty_points ?? 0).toFixed(1)} | Итоговая:{" "}
                   {s.final_grade !== null ? s.final_grade.toFixed(1) : "—"} | Оценено:{" "}
                   {s.graded_at ? formatDate(s.graded_at) : "—"}
@@ -736,18 +773,18 @@ export default function AssignmentPage() {
               </div>
             ))}
             {!submissionsLoading && submissions.length === 0 ? (
-              <div className="text-sm text-gray-600">В этом курсе пока нет студентов.</div>
+              <div className={`text-sm ${textSecondary}`}>В этом курсе пока нет студентов.</div>
             ) : null}
           </div>
         </div>
       ) : null}
 
       {me?.role === "student" && activeTab === "grading" ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md">
-          <div className="mb-2 text-lg font-semibold">Моя оценка</div>
-          {myGradeLoading ? <div className="text-sm text-gray-600">Loading...</div> : null}
+        <div className={`rounded-xl border ${cardBorder} ${cardBg} p-4 shadow-md`}>
+          <div className={`mb-2 text-lg font-semibold ${textPrimary}`}>Моя оценка</div>
+          {myGradeLoading ? <div className={`text-sm ${textSecondary}`}>Loading...</div> : null}
           {myGradeError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
               {myGradeError}
             </div>
           ) : null}
@@ -755,14 +792,14 @@ export default function AssignmentPage() {
             <div>
               <div className="mb-2">
                 {myGrade.grade === null ? (
-                  <div className="text-sm text-gray-600">Статус сдачи будет рассчитан после выставления оценки.</div>
+                  <div className={`text-sm ${textSecondary}`}>Статус сдачи будет рассчитан после выставления оценки.</div>
                 ) : myGrade.weeks_late > 0 ? (
-                  <div className="text-sm text-red-700">
+                  <div className={`text-sm ${isDarkTheme ? "text-red-400" : "text-red-700"}`}>
                     Просрочено на {myGrade.weeks_late} нед., максимальная оценка теперь{" "}
                     {myGrade.late_max_grade !== null ? myGrade.late_max_grade : 0}
                   </div>
                 ) : (
-                  <div className="text-sm text-green-700">Сдано вовремя ✓</div>
+                  <div className={`text-sm ${isDarkTheme ? "text-green-400" : "text-green-700"}`}>Сдано вовремя ✓</div>
                 )}
               </div>
               {myGrade.grade !== null ? (
@@ -770,15 +807,15 @@ export default function AssignmentPage() {
                   Моя оценка: {myGrade.grade} / {myGrade.grade_max}
                 </div>
               ) : (
-                <div className="text-sm text-gray-700">Оценка еще не выставлена</div>
+                <div className={`text-sm ${textSecondary}`}>Оценка еще не выставлена</div>
               )}
               {myGrade.final_grade !== null ? (
-                <div className="mt-1 text-base font-semibold text-purple-700">
+                <div className={`mt-1 text-base font-semibold ${isDarkTheme ? "text-purple-400" : "text-purple-700"}`}>
                   Итоговая с учетом штрафа: {myGrade.final_grade.toFixed(1)} / {myGrade.grade_max}
                 </div>
               ) : null}
               {myGrade.comment ? (
-                <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                <div className={`mt-2 rounded-md border ${cardBorder} ${isDarkTheme ? "bg-[#1f2937]" : "bg-gray-50"} p-3 text-sm ${textSecondary}`}>
                   Комментарий преподавателя: {myGrade.comment}
                 </div>
               ) : null}
@@ -788,12 +825,12 @@ export default function AssignmentPage() {
       ) : null}
 
       {view.file ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-3xl rounded-lg bg-white p-4 shadow-lg">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${modalOverlay}`}>
+          <div className={`w-full max-w-3xl rounded-lg p-4 shadow-lg ${modalBg}`}>
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <div className="text-lg font-semibold">File: {view.file.name}</div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className={`text-lg font-semibold ${textPrimary}`}>File: {view.file.name}</div>
+                <div className={`mt-1 text-xs ${textTertiary}`}>
                   {view.file.type} • {view.file.size ?? 0} bytes
                 </div>
               </div>
@@ -801,20 +838,20 @@ export default function AssignmentPage() {
                 onClick={() =>
                   setView({ file: null, loading: false, content: null, error: null })
                 }
-                className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+                className={`rounded-md border px-3 py-1 text-sm transition ${isDarkTheme ? "border-[#30363d] hover:bg-[#2d2d2d]" : "border-gray-300 hover:bg-gray-50"} ${inputBg} ${textPrimary}`}
               >
                 Close
               </button>
             </div>
 
             {view.loading ? (
-              <div className="text-sm text-gray-600">Loading file...</div>
+              <div className={`text-sm ${textSecondary}`}>Loading file...</div>
             ) : view.error ? (
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
                 {view.error}
               </div>
             ) : (
-              <pre className="max-h-[60vh] overflow-auto rounded-md border border-gray-100 bg-gray-50 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+              <pre className={`max-h-[60vh] overflow-auto rounded-md border p-3 text-xs leading-relaxed whitespace-pre-wrap ${cardBorder} ${inputBg} ${textPrimary}`}>
                 {view.content ?? ""}
               </pre>
             )}

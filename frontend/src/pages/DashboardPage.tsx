@@ -1,8 +1,17 @@
-export default function DashboardPage() {
+interface DashboardPageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function DashboardPage({ isDarkTheme = false }: DashboardPageProps) {
+  console.log("DashboardPage isDarkTheme:", isDarkTheme);
+  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const bodyText = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Дашборд</h1>
-      <p className="text-gray-600">Страница в разработке...</p>
+    <div className={`mx-auto max-w-5xl ${pageBg} transition-colors`}>
+      <h1 className={`mb-6 text-2xl font-semibold ${titleText} transition-colors`}>Дашборд</h1>
+      <p className={`${bodyText} transition-colors`}>Страница в разработке...</p>
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { getMe } from "../api/authApi";
 import { usePermissions } from "../hooks/usePermissions";
 import { usePendingCount } from "../context/PendingCountContext";
 import type { AdminUserRead, UserRole, UserRead } from "../api/types";
+import AdminPageHeader from "../components/AdminPageHeader";
 
 interface User {
   id: string;
@@ -37,12 +38,12 @@ interface User {
   lastLogin: string;
 }
 
-function getRoleBadge(role: User["role"]) {
+function getRoleBadge(role: User["role"], isDarkTheme: boolean) {
   const styles = {
-    student: "bg-blue-500/20 text-blue-400",
-    teacher: "bg-purple-500/20 text-purple-400",
-    admin: "bg-yellow-500/20 text-yellow-400",
-    laborant: "bg-pink-500/20 text-pink-400",
+    student: isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700",
+    teacher: isDarkTheme ? "bg-purple-500/20 text-purple-400" : "bg-purple-100 text-purple-700",
+    admin: isDarkTheme ? "bg-yellow-500/20 text-yellow-400" : "bg-yellow-100 text-yellow-700",
+    laborant: isDarkTheme ? "bg-pink-500/20 text-pink-400" : "bg-pink-100 text-pink-700",
   };
   const labels = {
     student: "Студент",
@@ -57,11 +58,11 @@ function getRoleBadge(role: User["role"]) {
   );
 }
 
-function getStatusBadge(status: User["status"]) {
+function getStatusBadge(status: User["status"], isDarkTheme: boolean) {
   const styles = {
-    active: "bg-green-500/20 text-green-400",
-    pending: "bg-yellow-500/20 text-yellow-400",
-    blocked: "bg-red-500/20 text-red-400",
+    active: isDarkTheme ? "bg-green-500/20 text-green-400" : "bg-green-100 text-green-700",
+    pending: isDarkTheme ? "bg-yellow-500/20 text-yellow-400" : "bg-yellow-100 text-yellow-700",
+    blocked: isDarkTheme ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700",
   };
   const labels = {
     active: "Активен",
@@ -79,7 +80,7 @@ interface UsersPageProps {
   isDarkTheme?: boolean;
 }
 
-export default function UsersPage({ isDarkTheme = true }: UsersPageProps) {
+export default function UsersPage({ isDarkTheme = false }: UsersPageProps) {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -356,17 +357,17 @@ useEffect(() => {
     {
       label: "Всего",
       value: totalUsers,
-      color: "text-white",
+      color: isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900",
     },
     {
       label: "Активных",
       value: users.filter(u => u.status === "active").length,
-      color: "text-white",
+      color: isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900",
     },
     {
       label: "Ожидают",
       value: users.filter(u => u.status === "pending").length,
-      color: "text-white",
+      color: isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900",
     },
     {
       label: "Заблокировано",
@@ -427,87 +428,115 @@ useEffect(() => {
   };
 
   // Theme-based colors
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-[#f5f3fa]";
-  const textPrimary = isDarkTheme ? "text-white" : "text-gray-900";
-  const cardBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-[#d4cfe6]";
-  const cardHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-50";
-  const textSecondary = isDarkTheme ? "text-gray-400" : "text-gray-500";
-  const textTertiary = isDarkTheme ? "text-gray-300" : "text-gray-600";
-  const headerBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-gray-200";
-  const inputBg = isDarkTheme ? "bg-[#252525] border-[#3d3d3d]" : "bg-white border-gray-300";
-  const dividerColor = isDarkTheme ? "divide-[#2d2d2d]" : "divide-gray-100";
-  const tableHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-50";
+  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  const textPrimary = isDarkTheme ? "text-white" : "text-slate-900";
+  const cardBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-slate-200 shadow-sm";
+  const cardHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-slate-50";
+  const textSecondary = isDarkTheme ? "text-gray-400" : "text-slate-500";
+  const textTertiary = isDarkTheme ? "text-gray-300" : "text-slate-400";
+  const headerBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-slate-200";
+  const inputBg = isDarkTheme ? "bg-[#252525] border-[#3d3d3d]" : "bg-slate-100 border-slate-200";
+  const dividerColor = isDarkTheme ? "divide-[#2d2d2d]" : "divide-slate-200";
+  const tableHover = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-slate-50";
+  // Table specific colors
+  const tableBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const tableBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-slate-200";
+  const tableHeaderText = isDarkTheme ? "text-[#6e7681]" : "text-slate-400";
+  const tableRowBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-slate-200";
+  const tableRowHover = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-slate-50";
+  const tableCellText = isDarkTheme ? "text-[#8b949e]" : "text-slate-500";
+  const tableNameText = isDarkTheme ? "text-[#ccd0d4]" : "text-slate-900";
+  const tableEmailText = isDarkTheme ? "text-[#6e7681]" : "text-slate-400";
+  const checkboxBorder = isDarkTheme ? "border-[#484f58]" : "border-gray-400";
+  const checkboxHoverBorder = isDarkTheme ? "hover:border-[#6e7681]" : "hover:border-gray-500";
+  const iconBg = isDarkTheme ? "bg-[#1f2937]" : "bg-gray-100";
+  const iconColor = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const actionBtnHover = isDarkTheme ? "hover:bg-[#30363d] hover:text-[#ccd0d4]" : "hover:bg-gray-200 hover:text-gray-900";
+  const actionBtnColor = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  // Modal colors
+  const modalBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const modalBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const modalText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const modalLabel = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const modalInputBg = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d]" : "bg-gray-50 border-gray-300";
+  const modalCardBg = isDarkTheme ? "bg-[#0d0d0d]" : "bg-gray-100";
+  const modalBtnHover = isDarkTheme ? "hover:bg-[#30363d]" : "hover:bg-gray-200";
+  const modalBtnText = isDarkTheme ? "text-[#6e7681]" : "text-gray-600";
+  // Pagination colors
+  const paginationBtn = isDarkTheme ? "bg-[#161616] border-[#30363d] text-[#8b949e] hover:text-[#ccd0d4]" : "bg-white border-gray-300 text-gray-600 hover:text-gray-900";
+  const paginationDropdown = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d] text-[#ccd0d4]" : "bg-gray-50 border-gray-300 text-gray-700";
+  const paginationDropdownBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const paginationDropdownItem = isDarkTheme ? "text-[#8b949e] hover:bg-[#1f2937]" : "text-gray-600 hover:bg-gray-100";
 
   return (
     <div className={`h-full overflow-y-auto ${pageBg} ${textPrimary} transition-colors`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className={`text-2xl font-bold ${textPrimary}`}>Все пользователи</h1>
-            <span className={`text-sm ${textSecondary}`}>
-              {filteredUsers.length === totalUsers 
-                ? `${totalUsers} ${pluralizeRecords(totalUsers)}` 
-                : `Найдено ${filteredUsers.length} из ${totalUsers}`}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
-              <Download className="h-4 w-4" />
-              Экспорт CSV
-            </button>
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
-              <Upload className="h-4 w-4" />
-              Импорт
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-sm text-white hover:bg-blue-700 transition-colors shadow-sm">
-              <Plus className="h-4 w-4" />
-              Добавить
-            </button>
-          </div>
-        </div>
+        <AdminPageHeader
+          isDarkTheme={isDarkTheme}
+          title="Все пользователи"
+          subtitle={filteredUsers.length === totalUsers 
+            ? `${totalUsers} ${pluralizeRecords(totalUsers)}` 
+            : `Найдено ${filteredUsers.length} из ${totalUsers}`}
+          actions={
+            <>
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
+                <Download className="h-4 w-4" />
+                Экспорт CSV
+              </button>
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${cardBg} ${cardHover}`}>
+                <Upload className="h-4 w-4" />
+                Импорт
+              </button>
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors shadow-sm ${isDarkTheme ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+                <Plus className="h-4 w-4" />
+                Добавить
+              </button>
+            </>
+          }
+        />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4">
           {stats.map((stat) => (
-            <div key={stat.label} className="bg-[#161616] rounded-xl p-5 border border-[#2d2d2d]">
-              <p className="text-sm text-[#8b949e] mb-1">{stat.label}</p>
-              <p className={`text-2xl font-bold ${stat.color === "text-white" ? "text-[#ccd0d4]" : stat.color}`}>{stat.value}</p>
+            <div key={stat.label} className={`${tableBg} rounded-xl p-5 border ${tableBorder}`}>
+              <p className={`text-sm ${tableHeaderText} mb-1`}>{stat.label}</p>
+              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
         </div>
 
         {/* Toolbar */}
-        <div className="bg-[#161616] rounded-xl p-4 border border-[#2d2d2d] flex items-center gap-3">
+        <div className={`${tableBg} rounded-xl p-4 border ${tableBorder} flex items-center gap-3`}>
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6e7681]" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${tableHeaderText}`} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Поиск по ФИО или Email..."
-              className="w-full pl-10 pr-10 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#ccd0d4] placeholder-[#6e7681] focus:outline-none focus:border-[#484f58] transition-colors"
+              className={`w-full pl-10 pr-10 py-2 ${modalInputBg} rounded-lg text-sm ${tableNameText} placeholder-${tableHeaderText} focus:outline-none focus:border-[#484f58] transition-colors`}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#30363d] rounded-full transition-colors"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 ${modalBtnHover} rounded-full transition-colors`}
               >
-                <X className="h-3.5 w-3.5 text-[#6e7681]" />
+                <X className={`h-3.5 w-3.5 ${tableHeaderText}`} />
               </button>
             )}
           </div>
           <div className="relative" ref={roleRef}>
             <button
               onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#8b949e] hover:text-[#ccd0d4] transition-colors"
+              className={`flex items-center gap-2 px-3 py-2 ${modalInputBg} rounded-lg text-sm ${tableCellText} ${tableNameText} transition-colors`}
             >
               <Users className="h-4 w-4" />
               {roleFilter === "all" ? "Все роли" : roleFilter === "admin" ? "Админ" : roleFilter === "teacher" ? "Препод" : roleFilter === "laborant" ? "Лаборант" : "Студент"}
               <ChevronDown className={`h-3 w-3 transition-transform ${showRoleDropdown ? "rotate-180" : ""}`} />
             </button>
             {showRoleDropdown && (
-              <div className="absolute top-full left-0 mt-1.5 w-36 bg-[#161616] border border-[#2d2d2d] rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className={`absolute top-full left-0 mt-1.5 w-36 ${tableBg} border ${tableBorder} rounded-xl shadow-xl z-50 overflow-hidden`}>
                 {[
                   { value: "all", label: "Все роли" },
                   { value: "admin", label: "Администратор" },
@@ -520,8 +549,8 @@ useEffect(() => {
                     onClick={() => { setRoleFilter(opt.value); setShowRoleDropdown(false); }}
                     className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
                       roleFilter === opt.value
-                        ? "bg-blue-500/20 text-blue-400"
-                        : "text-[#8b949e] hover:bg-[#1f2937]"
+                        ? (isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700")
+                        : `${tableCellText} ${tableRowHover}`
                     }`}
                   >
                     {opt.label}
@@ -533,14 +562,14 @@ useEffect(() => {
           <div className="relative" ref={statusRef}>
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#8b949e] hover:text-[#ccd0d4] transition-colors"
+              className={`flex items-center gap-2 px-3 py-2 ${modalInputBg} rounded-lg text-sm ${tableCellText} ${tableNameText} transition-colors`}
             >
               <CheckCircle className="h-4 w-4" />
               {statusFilter === "all" ? "Все статусы" : statusFilter === "active" ? "Активен" : statusFilter === "pending" ? "Ожидает" : "Заблокирован"}
               <ChevronDown className={`h-3 w-3 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
             </button>
             {showStatusDropdown && (
-              <div className="absolute top-full left-0 mt-1.5 w-36 bg-[#161616] border border-[#2d2d2d] rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className={`absolute top-full left-0 mt-1.5 w-36 ${tableBg} border ${tableBorder} rounded-xl shadow-xl z-50 overflow-hidden`}>
                 {[
                   { value: "all", label: "Все статусы" },
                   { value: "active", label: "Активен" },
@@ -552,8 +581,8 @@ useEffect(() => {
                     onClick={() => { setStatusFilter(opt.value); setShowStatusDropdown(false); }}
                     className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
                       statusFilter === opt.value
-                        ? "bg-blue-500/20 text-blue-400"
-                        : "text-[#8b949e] hover:bg-[#1f2937]"
+                        ? (isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700")
+                        : `${tableCellText} ${tableRowHover}`
                     }`}
                   >
                     {opt.label}
@@ -565,20 +594,20 @@ useEffect(() => {
           <div className="relative" ref={groupRef}>
             <button
               onClick={() => setShowGroupDropdown(!showGroupDropdown)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#8b949e] hover:text-[#ccd0d4] transition-colors"
+              className={`flex items-center gap-2 px-3 py-2 ${modalInputBg} rounded-lg text-sm ${tableCellText} ${tableNameText} transition-colors`}
             >
               <Briefcase className="h-4 w-4" />
               {groupFilter === "all" ? "Все группы" : groupFilter}
               <ChevronDown className={`h-3 w-3 transition-transform ${showGroupDropdown ? "rotate-180" : ""}`} />
             </button>
             {showGroupDropdown && (
-              <div className="absolute top-full left-0 mt-1.5 min-w-[160px] max-w-[200px] bg-[#161616] border border-[#2d2d2d] rounded-xl shadow-xl z-50 overflow-hidden max-h-60 overflow-y-auto">
+              <div className={`absolute top-full left-0 mt-1.5 min-w-[160px] max-w-[200px] ${tableBg} border ${tableBorder} rounded-xl shadow-xl z-50 overflow-hidden max-h-60 overflow-y-auto`}>
                 <button
                   onClick={() => { setGroupFilter("all"); setShowGroupDropdown(false); }}
                   className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
                     groupFilter === "all"
-                      ? "bg-blue-500/20 text-blue-400"
-                      : "text-[#8b949e] hover:bg-[#1f2937]"
+                      ? (isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700")
+                      : `${tableCellText} ${tableRowHover}`
                   }`}
                 >
                   Все группы
@@ -589,15 +618,15 @@ useEffect(() => {
                     onClick={() => { setGroupFilter(group); setShowGroupDropdown(false); }}
                     className={`w-full px-4 py-2.5 text-sm text-left transition-colors truncate ${
                       groupFilter === group
-                        ? "bg-blue-500/20 text-blue-400"
-                        : "text-[#8b949e] hover:bg-[#1f2937]"
+                        ? (isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700")
+                        : `${tableCellText} ${tableRowHover}`
                     }`}
                   >
                     {group}
                   </button>
                 ))}
                 {availableGroups.length === 0 && (
-                  <div className="px-4 py-2.5 text-sm text-[#6e7681]">Нет групп</div>
+                  <div className={`px-4 py-2.5 text-sm ${tableHeaderText}`}>Нет групп</div>
                 )}
               </div>
             )}
@@ -616,17 +645,17 @@ useEffect(() => {
             <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        <div className="bg-[#161616] rounded-xl border border-[#2d2d2d] overflow-hidden">
+        <div className={`${tableBg} rounded-xl border ${tableBorder} overflow-hidden`}>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#2d2d2d]">
+              <tr className={`border-b ${tableRowBorder}`}>
                 <th className="px-4 py-3 text-left">
                   <div
                     onClick={toggleSelectAll}
                     className={`w-[18px] h-[18px] rounded-[4px] border-[1.5px] flex items-center justify-center cursor-pointer transition-colors ${
                       selectedUsers.length === users.length && users.length > 0
                         ? "bg-blue-500 border-blue-500"
-                        : "bg-transparent border-[#484f58] hover:border-[#6e7681]"
+                        : `bg-transparent ${checkboxBorder} ${checkboxHoverBorder}`
                     }`}
                   >
                     {selectedUsers.length === users.length && users.length > 0 && (
@@ -636,13 +665,13 @@ useEffect(() => {
                     )}
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Пользователь</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Группа</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Роль</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Статус</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Репо</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Последний вход</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#6e7681] uppercase">Действия</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Пользователь</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Группа</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Роль</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Статус</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Репо</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Последний вход</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase ${tableHeaderText}`}>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -650,10 +679,10 @@ useEffect(() => {
                 <tr>
                   <td colSpan={8} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="p-4 bg-[#1f2937] rounded-full">
-                        <Search className="h-8 w-8 text-[#6e7681]" />
+                      <div className={`p-4 rounded-full ${iconBg}`}>
+                        <Search className={`h-8 w-8 ${iconColor}`} />
                       </div>
-                      <p className="text-[#8b949e]">Пользователи не найдены</p>
+                      <p className={tableCellText}>Пользователи не найдены</p>
                       {(roleFilter !== "all" || statusFilter !== "all" || groupFilter !== "all" || debouncedSearch) && (
                         <button
                           onClick={clearFilters}
@@ -667,14 +696,14 @@ useEffect(() => {
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-[#2d2d2d] last:border-b-0 hover:bg-[#1f2937] transition-colors">
+                  <tr key={user.id} className={`border-b ${tableRowBorder} last:border-b-0 ${tableRowHover} transition-colors`}>
                   <td className="px-4 py-3">
                     <div
                       onClick={() => toggleSelectUser(user.id)}
                       className={`w-[18px] h-[18px] rounded-[4px] border-[1.5px] flex items-center justify-center cursor-pointer transition-colors ${
                         selectedUsers.includes(user.id)
                           ? "bg-blue-500 border-blue-500"
-                          : "bg-transparent border-[#484f58] hover:border-[#6e7681]"
+                          : `bg-transparent ${checkboxBorder} ${checkboxHoverBorder}`
                       }`}
                     >
                       {selectedUsers.includes(user.id) && (
@@ -690,22 +719,22 @@ useEffect(() => {
                         {user.initials}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-[#ccd0d4]">{user.name}</p>
-                        <p className="text-xs text-[#6e7681]">{user.email}</p>
+                        <p className={`text-sm font-medium ${tableNameText}`}>{user.name}</p>
+                        <p className={`text-xs ${tableEmailText}`}>{user.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-[#8b949e]">{user.group}</td>
-                  <td className="px-4 py-3">{getRoleBadge(user.role)}</td>
-                  <td className="px-4 py-3">{getStatusBadge(user.status)}</td>
-                  <td className="px-4 py-3 text-sm text-[#8b949e]">{user.repos} репо</td>
-                  <td className="px-4 py-3 text-sm text-[#8b949e]">{user.lastLogin}</td>
+                  <td className={`px-4 py-3 text-sm ${tableCellText}`}>{user.group}</td>
+                  <td className="px-4 py-3">{getRoleBadge(user.role, isDarkTheme)}</td>
+                  <td className="px-4 py-3">{getStatusBadge(user.status, isDarkTheme)}</td>
+                  <td className={`px-4 py-3 text-sm ${tableCellText}`}>{user.repos} репо</td>
+                  <td className={`px-4 py-3 text-sm ${tableCellText}`}>{user.lastLogin}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setViewUser(user)}
                         disabled={actionLoading}
-                        className="p-1.5 rounded-lg hover:bg-[#30363d] text-[#6e7681] hover:text-[#ccd0d4] transition-colors"
+                        className={`p-1.5 rounded-lg ${actionBtnHover} ${actionBtnColor} transition-colors`}
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -714,7 +743,7 @@ useEffect(() => {
                           onClick={() => handleEdit(user)}
                           disabled={actionLoading || user.role === "admin"}
                           title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
-                          className="p-1.5 rounded-lg hover:bg-[#30363d] text-[#6e7681] hover:text-[#ccd0d4] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`p-1.5 rounded-lg ${actionBtnHover} ${actionBtnColor} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
                           <Edit className="h-4 w-4" />
                         </button>
@@ -724,7 +753,7 @@ useEffect(() => {
                           onClick={() => handleBlockToggle(user)}
                           disabled={actionLoading || user.role === "admin"}
                           title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
-                          className="p-1.5 rounded-lg hover:bg-[#30363d] text-[#6e7681] hover:text-[#ccd0d4] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`p-1.5 rounded-lg ${actionBtnHover} ${actionBtnColor} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
                           <Unlock className="h-4 w-4" />
                         </button>
@@ -733,7 +762,7 @@ useEffect(() => {
                           onClick={() => handleBlockToggle(user)}
                           disabled={actionLoading || user.role === "admin"}
                           title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
-                          className="p-1.5 rounded-lg hover:bg-[#30363d] text-[#6e7681] hover:text-[#ccd0d4] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`p-1.5 rounded-lg ${actionBtnHover} ${actionBtnColor} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
                           <Lock className="h-4 w-4" />
                         </button>
@@ -743,7 +772,7 @@ useEffect(() => {
                           onClick={() => handleApprove(user)}
                           disabled={actionLoading || user.role === "admin"}
                           title={user.role === "admin" ? "Недостаточно прав для изменения этого профиля" : ""}
-                          className="p-1.5 rounded-lg hover:bg-green-500/20 text-[#6e7681] hover:text-green-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`p-1.5 rounded-lg ${isDarkTheme ? "hover:bg-green-500/20" : "hover:bg-green-100"} ${actionBtnColor} hover:text-green-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
                           <Check className="h-4 w-4" />
                         </button>
@@ -797,22 +826,22 @@ useEffect(() => {
           return (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-sm text-[#6e7681]">
+                <span className={`text-sm ${tableHeaderText}`}>
                   Показано {filteredUsers.length} из {totalUsers}
                   {roleFilter !== "all" || statusFilter !== "all" || groupFilter !== "all" ? " (отфильтровано)" : ""}
                 </span>
                 <div className="flex items-center gap-2" ref={perPageRef}>
-                  <span className="text-sm text-[#6e7681]">На странице:</span>
+                  <span className={`text-sm ${tableHeaderText}`}>На странице:</span>
                   <div className="relative">
                     <button
                       onClick={() => setShowPerPageDropdown(!showPerPageDropdown)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#ccd0d4] hover:bg-[#161616] transition-colors"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${paginationDropdown} ${isDarkTheme ? "hover:bg-[#161616]" : "hover:bg-white"}`}
                     >
                       {itemsPerPage}
                       <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showPerPageDropdown ? "rotate-180" : ""}`} />
                     </button>
                     {showPerPageDropdown && (
-                      <div className="absolute top-full left-0 mt-1.5 w-20 bg-[#161616] border border-[#2d2d2d] rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className={`absolute top-full left-0 mt-1.5 w-20 rounded-xl shadow-xl z-50 overflow-hidden ${paginationDropdownBg}`}>
                         {[10, 25, 50].map((val) => (
                           <button
                             key={val}
@@ -823,8 +852,8 @@ useEffect(() => {
                             }}
                             className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
                               itemsPerPage === val
-                                ? "bg-blue-500/20 text-blue-400"
-                                : "text-[#8b949e] hover:bg-[#1f2937]"
+                                ? (isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700")
+                                : paginationDropdownItem
                             }`}
                           >
                             {val}
@@ -841,14 +870,14 @@ useEffect(() => {
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="p-2 rounded-lg bg-[#161616] border border-[#30363d] text-[#8b949e] hover:text-[#ccd0d4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${paginationBtn}`}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
 
                   {pageNumbers.map((page, idx) => (
                     page === -1 ? (
-                      <span key={`ellipsis-${idx}`} className="px-2 text-[#6e7681]">...</span>
+                      <span key={`ellipsis-${idx}`} className={`px-2 ${tableHeaderText}`}>...</span>
                     ) : (
                       <button
                         key={page}
@@ -856,7 +885,7 @@ useEffect(() => {
                         className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
                           currentPage === page
                             ? "bg-blue-600 text-white"
-                            : "bg-[#161616] border border-[#30363d] text-[#8b949e] hover:text-[#ccd0d4]"
+                            : paginationBtn
                         }`}
                       >
                         {page}
@@ -867,7 +896,7 @@ useEffect(() => {
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg bg-[#161616] border border-[#30363d] text-[#8b949e] hover:text-[#ccd0d4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${paginationBtn}`}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -881,10 +910,10 @@ useEffect(() => {
       {/* View User Modal */}
       {viewUser && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#161616] border border-[#2d2d2d] rounded-xl p-6 max-w-md w-full mx-4">
+          <div className={`${modalBg} border ${modalBorder} rounded-xl p-6 max-w-md w-full mx-4`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[#ccd0d4]">Профиль пользователя</h3>
-              <button onClick={() => setViewUser(null)} className="p-1 hover:bg-[#30363d] rounded text-[#6e7681]">
+              <h3 className={`text-lg font-semibold ${modalText}`}>Профиль пользователя</h3>
+              <button onClick={() => setViewUser(null)} className={`p-1 ${modalBtnHover} rounded ${modalBtnText}`}>
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -894,33 +923,33 @@ useEffect(() => {
                   {viewUser.initials}
                 </div>
                 <div>
-                  <p className="font-medium text-[#ccd0d4]">{viewUser.name}</p>
-                  <p className="text-sm text-[#6e7681]">{viewUser.email}</p>
+                  <p className={`font-medium ${modalText}`}>{viewUser.name}</p>
+                  <p className={`text-sm ${modalBtnText}`}>{viewUser.email}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-[#0d0d0d] p-3 rounded-lg">
-                  <p className="text-[#6e7681]">Роль</p>
-                  <p className="font-medium text-[#ccd0d4]">
+                <div className={`${modalCardBg} p-3 rounded-lg`}>
+                  <p className={modalBtnText}>Роль</p>
+                  <p className={`font-medium ${modalText}`}>
                     {viewUser.role === "admin" ? "Администратор" :
                      viewUser.role === "teacher" ? "Преподаватель" :
                      viewUser.role === "laborant" ? "Лаборант" : "Студент"}
                   </p>
                 </div>
-                <div className="bg-[#0d0d0d] p-3 rounded-lg">
-                  <p className="text-[#6e7681]">Группа</p>
-                  <p className="font-medium text-[#ccd0d4]">{viewUser.group}</p>
+                <div className={`${modalCardBg} p-3 rounded-lg`}>
+                  <p className={modalBtnText}>Группа</p>
+                  <p className={`font-medium ${modalText}`}>{viewUser.group}</p>
                 </div>
-                <div className="bg-[#0d0d0d] p-3 rounded-lg">
-                  <p className="text-[#6e7681]">Статус</p>
-                  <p className="font-medium text-[#ccd0d4]">
+                <div className={`${modalCardBg} p-3 rounded-lg`}>
+                  <p className={modalBtnText}>Статус</p>
+                  <p className={`font-medium ${modalText}`}>
                     {viewUser.status === "active" ? "Активен" :
                      viewUser.status === "blocked" ? "Заблокирован" : "Ожидает"}
                   </p>
                 </div>
-                <div className="bg-[#0d0d0d] p-3 rounded-lg">
-                  <p className="text-[#6e7681]">Последний вход</p>
-                  <p className="font-medium text-[#ccd0d4]">{viewUser.lastLogin}</p>
+                <div className={`${modalCardBg} p-3 rounded-lg`}>
+                  <p className={modalBtnText}>Последний вход</p>
+                  <p className={`font-medium ${modalText}`}>{viewUser.lastLogin}</p>
                 </div>
               </div>
             </div>
@@ -931,20 +960,20 @@ useEffect(() => {
       {/* Edit User Modal */}
       {editUser && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#161616] border border-[#2d2d2d] rounded-xl p-6 max-w-md w-full mx-4">
+          <div className={`${modalBg} border ${modalBorder} rounded-xl p-6 max-w-md w-full mx-4`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[#ccd0d4]">Редактирование пользователя</h3>
-              <button onClick={() => setEditUser(null)} className="p-1 hover:bg-[#30363d] rounded text-[#6e7681]">
+              <h3 className={`text-lg font-semibold ${modalText}`}>Редактирование пользователя</h3>
+              <button onClick={() => setEditUser(null)} className={`p-1 ${modalBtnHover} rounded ${modalBtnText}`}>
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1 text-[#8b949e]">Роль</label>
+                <label className={`block text-sm font-medium mb-1 ${modalLabel}`}>Роль</label>
                 <select
                   value={editForm.role}
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserRole })}
-                  className="w-full px-3 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-[#ccd0d4]"
+                  className={`w-full px-3 py-2 rounded-lg ${modalInputBg} ${modalText}`}
                 >
                   <option value="student">Студент</option>
                   <option value="teacher">Преподаватель</option>
@@ -953,11 +982,11 @@ useEffect(() => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1 text-[#8b949e]">Группа</label>
+                <label className={`block text-sm font-medium mb-1 ${modalLabel}`}>Группа</label>
                 <select
                   value={editForm.group_name}
                   onChange={(e) => setEditForm({ ...editForm, group_name: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-[#ccd0d4]"
+                  className={`w-full px-3 py-2 rounded-lg ${modalInputBg} ${modalText}`}
                 >
                   <option value="">— Не выбрана —</option>
                   {availableGroups.map((group) => (
@@ -968,7 +997,7 @@ useEffect(() => {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setEditUser(null)}
-                  className="flex-1 px-4 py-2 border border-[#30363d] rounded-lg hover:bg-[#1f2937] text-[#8b949e]"
+                  className={`flex-1 px-4 py-2 border rounded-lg ${isDarkTheme ? "border-[#30363d] hover:bg-[#1f2937]" : "border-gray-300 hover:bg-gray-100"} ${modalLabel}`}
                 >
                   Отмена
                 </button>

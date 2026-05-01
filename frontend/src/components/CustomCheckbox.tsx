@@ -4,9 +4,14 @@ interface CustomCheckboxProps {
   checked: boolean;
   onChange?: () => void;
   className?: string;
+  isDarkTheme?: boolean;
 }
 
-export function CustomCheckbox({ checked, onChange, className = "" }: CustomCheckboxProps) {
+export function CustomCheckbox({ checked, onChange, className = "", isDarkTheme = true }: CustomCheckboxProps) {
+  const uncheckedBg = isDarkTheme ? "bg-[#1e1e1e]" : "bg-white";
+  const uncheckedBorder = isDarkTheme ? "border-[#3f3f46]" : "border-slate-300";
+  const uncheckedHover = isDarkTheme ? "hover:border-[#52525b]" : "hover:border-slate-400";
+
   return (
     <div
       onClick={onChange}
@@ -15,7 +20,7 @@ export function CustomCheckbox({ checked, onChange, className = "" }: CustomChec
         flex items-center justify-center shrink-0
         ${checked
           ? "bg-gradient-to-r from-blue-600 to-violet-600 border-transparent"
-          : "bg-[#1e1e1e] border border-[#3f3f46] hover:border-[#52525b]"
+          : `${uncheckedBg} border ${uncheckedBorder} ${uncheckedHover}`
         }
         ${className}
       `}

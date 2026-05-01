@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Search, Bell, Command, ChevronDown, LogOut, User, Shield, Activity, Moon, Sun } from "lucide-react";
 import { clearToken } from "../api/client";
 import { getMe, invalidateMeCache } from "../api/authApi";
+import { getServiceStatus } from "../api/adminApi";
 import type { UserRole } from "../api/types";
 
 // Status indicator component
@@ -12,16 +13,19 @@ function StatusIndicator({ status, label, isDarkTheme = true }: { status: "onlin
     offline: "bg-red-500",
     warning: "bg-amber-500",
   };
+  const statusHover = isDarkTheme ? "hover:bg-white/5" : "hover:bg-slate-100";
+  const statusText = isDarkTheme ? "text-[#9ca3af]" : "text-slate-500";
+  const statusTextHover = isDarkTheme ? "group-hover:text-gray-300" : "group-hover:text-slate-700";
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors cursor-pointer group ${isDarkTheme ? "hover:bg-white/5" : "hover:bg-black/5"}`}>
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors cursor-pointer group ${statusHover}`}>
       <div className="relative">
         <div className={`w-2 h-2 rounded-full ${colors[status]}`} />
         {status === "offline" && (
           <div className={`absolute inset-0 w-2 h-2 rounded-full ${colors[status]} animate-ping`} />
         )}
       </div>
-      <span className={`text-xs transition-colors ${isDarkTheme ? "text-[#9ca3af] group-hover:text-gray-300" : "text-gray-500 group-hover:text-gray-700"}`}>{label}</span>
+      <span className={`text-xs transition-colors ${statusText} ${statusTextHover}`}>{label}</span>
     </div>
   );
 }
@@ -31,7 +35,7 @@ interface AdminHeaderProps {
   onToggleTheme?: () => void;
 }
 
-export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: AdminHeaderProps) {
+export default function AdminHeader({ isDarkTheme = false, onToggleTheme }: AdminHeaderProps) {
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,11 +47,11 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
   const [searchQuery, setSearchQuery] = useState("");
   const [hasNotifications, setHasNotifications] = useState(true);
 
-  // System status (mock for now)
+  // System status from API
   const [systemStatus, setSystemStatus] = useState<{
     api: "online" | "offline";
     database: "online" | "offline";
-  }>({ api: "online", database: "online" });
+  }>({ api: "offline", database: "offline" });
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +76,33 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Fetch system status
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStatus() {
+      try {
+        const status = await getServiceStatus();
+        if (!cancelled) {
+          setSystemStatus({
+            api: status?.api ? "online" : "offline",
+            database: status?.db ? "online" : "offline",
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setSystemStatus({ api: "offline", database: "offline" });
+        }
+      }
+    }
+    loadStatus();
+    // Refresh every 30 seconds
+    const interval = setInterval(loadStatus, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
@@ -113,18 +144,31 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
 
   // Theme-based colors
   const headerBg = isDarkTheme ? "bg-[#111111]" : "bg-white";
-  const headerBorder = isDarkTheme ? "border-[#30363d]" : "border-gray-200";
-  const logoText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
-  const dividerColor = isDarkTheme ? "bg-[#30363d]" : "bg-gray-300";
-  const subText = isDarkTheme ? "text-[#8b949e]" : "text-gray-500";
-  const searchBg = isDarkTheme ? "bg-[#0d0d0d]" : "bg-gray-100";
-  const searchBorder = isDarkTheme ? "border-[#30363d]" : "border-gray-300";
-  const searchText = isDarkTheme ? "text-gray-300" : "text-gray-900";
-  const searchPlaceholder = isDarkTheme ? "placeholder-[#8b949e]" : "placeholder-gray-500";
-  const shortcutBg = isDarkTheme ? "bg-[#30363d]/50" : "bg-gray-200";
-  const iconColor = isDarkTheme ? "text-[#8b949e] hover:text-white hover:bg-white/5" : "text-gray-500 hover:text-gray-900 hover:bg-black/5";
-  const avatarRing = isDarkTheme ? "ring-[#30363d]" : "ring-gray-300";
-  const avatarBg = isDarkTheme ? "bg-[#30363d] text-[#ccd0d4] ring-[#484f58]" : "bg-gray-200 text-gray-700 ring-gray-300";
+  const headerBorder = isDarkTheme ? "border-[#30363d]" : "border-slate-200";
+  const logoText = isDarkTheme ? "text-[#ccd0d4]" : "text-slate-900";
+  const dividerColor = isDarkTheme ? "bg-[#30363d]" : "bg-slate-300";
+  const subText = isDarkTheme ? "text-[#8b949e]" : "text-slate-500";
+  const searchBg = isDarkTheme ? "bg-[#0d0d0d]" : "bg-slate-100";
+  const searchBorder = isDarkTheme ? "border-[#30363d]" : "border-slate-200";
+  const searchText = isDarkTheme ? "text-gray-300" : "text-slate-900";
+  const searchPlaceholder = isDarkTheme ? "placeholder-[#8b949e]" : "placeholder-slate-400";
+  const shortcutBg = isDarkTheme ? "bg-[#30363d]/50" : "bg-slate-200";
+  const iconColor = isDarkTheme ? "text-[#8b949e] hover:text-white hover:bg-white/5" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100";
+  const avatarRing = isDarkTheme ? "ring-[#30363d]" : "ring-slate-300";
+  const avatarBg = isDarkTheme ? "bg-[#30363d] text-[#ccd0d4] ring-[#484f58]" : "bg-slate-200 text-slate-700 ring-slate-300";
+  const searchIconColor = isDarkTheme ? "text-gray-500 group-focus-within:text-gray-400" : "text-slate-400 group-focus-within:text-slate-600";
+  const searchFocusBg = isDarkTheme ? "focus:bg-[#161616]" : "focus:bg-white";
+  const shortcutText = isDarkTheme ? "text-[#8b949e]" : "text-slate-500";
+  const dropdownBg = isDarkTheme ? "bg-[#161616] border-[#30363d]" : "bg-white border-slate-200";
+  const dropdownBorder = isDarkTheme ? "border-[#30363d]" : "border-slate-200";
+  const dropdownText = isDarkTheme ? "text-[#8b949e] hover:bg-white/5 hover:text-[#ccd0d4]" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+  const dropdownDivider = isDarkTheme ? "border-[#30363d]" : "border-slate-200";
+  const statusHover = isDarkTheme ? "hover:bg-white/5" : "hover:bg-slate-100";
+  const statusText = isDarkTheme ? "text-[#9ca3af]" : "text-slate-500";
+  const statusTextHover = isDarkTheme ? "group-hover:text-gray-300" : "group-hover:text-slate-700";
+  const logoutText = isDarkTheme ? "text-red-400 hover:bg-red-500/10 hover:text-red-300" : "text-red-600 hover:bg-red-50 hover:text-red-700";
+  const chevronColor = isDarkTheme ? "text-[#8b949e]" : "text-slate-500";
+  const notifBorder = isDarkTheme ? "border-[#111111]" : "border-white";
 
   return (
     <header className={`${headerBg} border-b ${headerBorder} transition-colors`}>
@@ -146,16 +190,16 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
           {/* Center: Search - wider */}
           <div className="flex-1 max-w-2xl mx-8 hidden md:block">
             <form onSubmit={handleSearch} className="relative group">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${isDarkTheme ? "text-gray-500 group-focus-within:text-gray-400" : "text-gray-400 group-focus-within:text-gray-600"}`} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${searchIconColor}`} />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск по системе..."
-                className={`w-full h-9 pl-10 pr-12 rounded-lg text-sm outline-none transition-all duration-200 ${searchBg} ${searchBorder} ${searchText} ${searchPlaceholder} border focus:ring-2 focus:ring-blue-500/50 ${isDarkTheme ? "focus:bg-[#161616]" : "focus:bg-white"}`}
+                className={`w-full h-9 pl-10 pr-12 rounded-lg text-sm outline-none transition-all duration-200 ${searchBg} ${searchBorder} ${searchText} ${searchPlaceholder} border focus:ring-2 focus:ring-blue-500/50 ${searchFocusBg}`}
               />
-              <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${shortcutBg} ${isDarkTheme ? "text-[#8b949e]" : "text-gray-500"}`}>
+              <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${shortcutBg} ${shortcutText}`}>
                 <Command className="h-3 w-3" />
                 <span>K</span>
               </div>
@@ -190,7 +234,7 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
             >
               <Bell className="h-5 w-5" />
               {hasNotifications && (
-                <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 ${isDarkTheme ? "border-[#111111]" : "border-white"}`}>
+                <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 ${notifBorder}`}>
                   <span className="absolute inset-0 bg-red-500 rounded-full animate-ping" />
                 </span>
               )}
@@ -200,7 +244,7 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
             <div className="relative ml-2" data-profile-menu>
               <button
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors ${isDarkTheme ? "hover:bg-white/5" : "hover:bg-black/5"}`}
+                className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors ${statusHover}`}
               >
                 {avatarUrl ? (
                   <img
@@ -217,13 +261,13 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
                   <span className={`text-sm font-medium leading-tight transition-colors ${logoText}`}>{userName}</span>
                   <span className={`text-[10px] leading-tight transition-colors ${subText}`}>Администратор</span>
                 </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${profileMenuOpen ? "rotate-180" : ""} ${isDarkTheme ? "text-[#8b949e]" : "text-gray-500"}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${profileMenuOpen ? "rotate-180" : ""} ${chevronColor}`} />
               </button>
 
               {/* Profile dropdown */}
               {profileMenuOpen && (
-                <div className={`absolute right-0 mt-2 w-56 rounded-lg shadow-xl z-50 py-1 border ${isDarkTheme ? "bg-[#161616] border-[#30363d]" : "bg-white border-gray-200"}`}>
-                  <div className={`px-3 py-2 border-b ${isDarkTheme ? "border-[#30363d]" : "border-gray-200"}`}>
+                <div className={`absolute right-0 mt-2 w-56 rounded-lg shadow-xl z-50 py-1 border ${dropdownBg}`}>
+                  <div className={`px-3 py-2 border-b ${dropdownBorder}`}>
                     <p className={`text-sm font-medium truncate transition-colors ${logoText}`}>{userName}</p>
                     <p className={`text-xs truncate transition-colors ${subText}`}>{userRole || "admin"}</p>
                   </div>
@@ -231,7 +275,7 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
                   <Link
                     to="/profile"
                     onClick={() => setProfileMenuOpen(false)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${isDarkTheme ? "text-[#8b949e] hover:bg-white/5 hover:text-[#ccd0d4]" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${dropdownText}`}
                   >
                     <User className="h-4 w-4" />
                     Профиль
@@ -240,7 +284,7 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
                   <Link
                     to="/admin/settings"
                     onClick={() => setProfileMenuOpen(false)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${isDarkTheme ? "text-[#8b949e] hover:bg-white/5 hover:text-[#ccd0d4]" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${dropdownText}`}
                   >
                     <Shield className="h-4 w-4" />
                     Настройки безопасности
@@ -249,17 +293,17 @@ export default function AdminHeader({ isDarkTheme = true, onToggleTheme }: Admin
                   <Link
                     to="/admin/monitoring"
                     onClick={() => setProfileMenuOpen(false)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${isDarkTheme ? "text-[#8b949e] hover:bg-white/5 hover:text-[#ccd0d4]" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${dropdownText}`}
                   >
                     <Activity className="h-4 w-4" />
                     Мониторинг
                   </Link>
 
-                  <div className={`border-t my-1 ${isDarkTheme ? "border-[#30363d]" : "border-gray-200"}`} />
+                  <div className={`border-t my-1 ${dropdownDivider}`} />
 
                   <button
                     onClick={onLogout}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${isDarkTheme ? "text-red-400 hover:bg-red-500/10 hover:text-red-300" : "text-red-600 hover:bg-red-50 hover:text-red-700"}`}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${logoutText}`}
                   >
                     <LogOut className="h-4 w-4" />
                     Выйти

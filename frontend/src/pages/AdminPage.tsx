@@ -30,6 +30,7 @@ import { getAdminUsers, getSystemMetrics, getServiceStatus, getBackups, createBa
 import type { SystemMetrics, ServiceStatus, BackupInfo, FacultyCommitsStat, ActiveRepositoryStat } from "../api/types";
 import { usePermissions } from "../hooks/usePermissions";
 import toast from "react-hot-toast";
+import AdminPageHeader from "../components/AdminPageHeader";
 
 interface Stats {
   total: number;
@@ -357,29 +358,30 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
     <div className={`h-full overflow-auto ${pageBg} transition-colors`}>
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className={`text-2xl font-bold transition-colors ${textPrimary}`}>Панель администратора</h1>
-            <p className={`mt-1 text-sm transition-colors ${textSecondary}`}>
-              API: <span className={systemStatus.api === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.api === "online" ? "Online" : "Offline"} | DB: <span className={systemStatus.db === "online" ? "text-emerald-500" : "text-red-500"}>●</span> {systemStatus.db === "online" ? "Online" : "Offline"}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${buttonBg}`}
-            >
-              <Download className="h-4 w-4" />
-              Экспорт отчёта
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Новый курс
-            </button>
-          </div>
+        <div className="mb-8">
+          <AdminPageHeader
+            isDarkTheme={isDarkTheme}
+            title="Панель администратора"
+            subtitle={`API: ${systemStatus.api === "online" ? "● Online" : "● Offline"} | DB: ${systemStatus.db === "online" ? "● Online" : "● Offline"}`}
+            actions={
+              <>
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${buttonBg}`}
+                >
+                  <Download className="h-4 w-4" />
+                  Экспорт отчёта
+                </button>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Новый курс
+                </button>
+              </>
+            }
+          />
         </div>
 
         {/* Stats Row */}
@@ -393,9 +395,9 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mb-6">
           {/* Left - New Users Table (60%) */}
           <div className={`lg:col-span-3 rounded-xl border shadow-sm transition-colors ${cardBg}`}>
-            <div className="p-5 flex items-center justify-between border-b border-gray-100 dark:border-[#2d2d2d]">
+            <div className={`p-5 flex items-center justify-between border-b ${isDarkTheme ? "border-[#2d2d2d]" : "border-gray-100"}`}>
               <h2 className={`text-lg font-semibold transition-colors ${textPrimary}`}>Новые пользователи</h2>
-              <Link to="/users" className={`group text-sm flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 ${isDarkTheme ? "dark:text-blue-400 dark:hover:text-blue-300" : ""}`}>
+              <Link to="/users" className={`group text-sm flex items-center gap-1 font-medium hover:text-blue-700 ${isDarkTheme ? "text-blue-400 hover:text-blue-300" : "text-blue-600"}`}>
                 Все <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
@@ -530,7 +532,7 @@ export default function AdminPage({ isDarkTheme = true }: AdminPageProps) {
               {notifications.length > 0 && (
                 <button
                   onClick={clearAllNotifications}
-                  className={`flex items-center gap-1 text-xs font-medium transition-colors ${textSecondary} hover:${isDarkTheme ? "text-gray-300" : "text-gray-700"}`}
+                  className={`flex items-center gap-1 text-xs font-medium transition-colors ${textSecondary} ${isDarkTheme ? "hover:text-gray-300" : "hover:text-gray-700"}`}
                 >
                   <X className="h-3 w-3" />
                   Очистить все

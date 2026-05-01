@@ -9,7 +9,7 @@ interface NavBarProps {
   onToggleTheme?: () => void;
 }
 
-export default function NavBar({ isDarkTheme = true, onToggleTheme }: NavBarProps) {
+export default function NavBar({ isDarkTheme = false, onToggleTheme }: NavBarProps) {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("User");
   const [userRole, setUserRole] = useState<UserRole | null>(null);

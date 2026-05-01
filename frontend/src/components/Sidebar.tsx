@@ -42,7 +42,7 @@ const adminMenuSections: MenuSection[] = [
   {
     title: "ОБЗОР",
     items: [
-      { path: "/admin", label: "Дашборд", icon: LayoutGrid },
+      { path: "/dashboard", label: "Дашборд", icon: LayoutGrid },
     ],
   },
   {

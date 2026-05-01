@@ -109,22 +109,30 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString("ru-RU");
 }
 
-function Dropdown({ label, value, options, onChange }: {
+function Dropdown({ label, value, options, onChange, isDarkTheme = true }: {
   label: string;
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  isDarkTheme?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+
+  const dropdownBtnBg = isDarkTheme ? "bg-[#1e1e1e] hover:bg-[#2d2d2d]" : "bg-white hover:bg-gray-100";
+  const dropdownBtnText = isDarkTheme ? "text-gray-300" : "text-gray-700";
+  const dropdownIconColor = isDarkTheme ? "text-gray-500" : "text-gray-400";
+  const dropdownBg = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const dropdownItemHover = isDarkTheme ? "hover:bg-[#2d2d2d]" : "hover:bg-gray-100";
+  const dropdownItemText = isDarkTheme ? "text-gray-300" : "text-gray-700";
 
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1e1e1e] hover:bg-[#2d2d2d] rounded-lg text-sm text-gray-300 transition-colors"
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${dropdownBtnBg} ${dropdownBtnText}`}
       >
         {options.find((o: {value: string, label: string}) => o.value === value)?.label || label}
-        <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 ${dropdownIconColor} transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
         <>
@@ -132,7 +140,7 @@ function Dropdown({ label, value, options, onChange }: {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute top-full left-0 mt-1 bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg shadow-lg z-50 min-w-[140px]">
+          <div className={`absolute top-full left-0 mt-1 rounded-lg shadow-lg z-50 min-w-[140px] border ${dropdownBg}`}>
             {options.map((option) => (
               <button
                 key={option.value}
@@ -140,8 +148,8 @@ function Dropdown({ label, value, options, onChange }: {
                   onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-[#2d2d2d] transition-colors ${
-                  value === option.value ? "text-blue-400" : "text-gray-300"
+                className={`w-full px-3 py-2 text-left text-sm ${dropdownItemHover} transition-colors ${
+                  value === option.value ? "text-blue-400" : dropdownItemText
                 }`}
               >
                 {option.label}
@@ -162,7 +170,11 @@ function getAuthHeaders() {
   };
 }
 
-export default function RepositoriesPage() {
+interface RepositoriesPageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function RepositoriesPage({ isDarkTheme = true }: RepositoriesPageProps) {
   // Data states
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [stats, setStats] = useState<OverviewStats | null>(null);
@@ -287,7 +299,7 @@ export default function RepositoriesPage() {
     if (!stats) return [];
     const blockedCount = repositories.filter((r) => r.is_blocked).length; // Approximate
     return [
-      { label: "Всего репо", value: stats.total_repositories, color: "text-white" },
+      { label: "Всего репо", value: stats.total_repositories, color: isDarkTheme ? "text-white" : "text-gray-900" },
       { label: "Публичных", value: stats.repositories_by_type.public, color: "text-emerald-400" },
       { label: "Приватных", value: stats.repositories_by_type.private, color: "text-gray-400" },
       { label: "Курсовых", value: stats.repositories_by_type.course, color: "text-blue-400" },
@@ -320,10 +332,10 @@ export default function RepositoriesPage() {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#111111] text-white">
+      <div className={`h-full flex items-center justify-center ${isDarkTheme ? "bg-[#111111] text-white" : "bg-gray-50 text-gray-900"}`}>
         <div className="text-center">
           <p className="text-red-400 mb-2">Ошибка загрузки</p>
-          <p className="text-[#8b949e]">{error}</p>
+          <p className={isDarkTheme ? "text-[#8b949e]" : "text-gray-500"}>{error}</p>
           <button
             onClick={fetchRepositories}
             className="mt-4 px-4 py-2 bg-blue-600 rounded-lg text-sm"
@@ -335,17 +347,33 @@ export default function RepositoriesPage() {
     );
   }
 
+  const pageBg = isDarkTheme ? "bg-[#111111] text-white" : "bg-slate-50 text-slate-900";
+  const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-slate-200 shadow-sm";
+  const cardBgLight = isDarkTheme ? "bg-[#0d0d0d]" : "bg-slate-100";
+  const textPrimary = isDarkTheme ? "text-white" : "text-slate-900";
+  const textSecondary = isDarkTheme ? "text-gray-500" : "text-slate-500";
+  const textTertiary = isDarkTheme ? "text-[#8b949e]" : "text-slate-400";
+  const inputBg = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d]" : "bg-slate-100 border-slate-200";
+  const inputText = isDarkTheme ? "text-[#ccd0d4]" : "text-slate-900";
+  const inputPlaceholder = isDarkTheme ? "placeholder-[#6e7681]" : "placeholder-slate-400";
+  const tableHeaderText = isDarkTheme ? "text-[#6e7681]" : "text-slate-400";
+  const tableRowHover = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-slate-50";
+  const tableBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-slate-200";
+  const btnBg = isDarkTheme ? "bg-[#161616] border-[#30363d] hover:bg-[#1f2937]" : "bg-white border-slate-200 hover:bg-slate-50";
+  const btnText = isDarkTheme ? "text-[#8b949e]" : "text-slate-500";
+  const btnTextHover = isDarkTheme ? "hover:text-[#ccd0d4]" : "hover:text-slate-900";
+
   return (
-    <div className="h-full overflow-y-auto bg-[#111111] text-white">
+    <div className={`h-full overflow-y-auto ${pageBg}`}>
       <div className="max-w-[1400px] mx-auto py-6 px-6 pb-20">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">Все репозитории</h1>
-            <span className="text-sm text-gray-500">{totalCount} репозиториев</span>
+            <h1 className={`text-2xl font-bold ${textPrimary}`}>Все репозитории</h1>
+            <span className={`text-sm ${textSecondary}`}>{totalCount} репозиториев</span>
           </div>
           <div className="flex items-center gap-3">
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-[#161616] hover:bg-[#1f2937] border border-[#30363d] rounded-lg text-sm text-[#8b949e] transition-colors">
+            <button className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${btnBg} ${btnText} ${btnTextHover}`}>
               <Download className="h-4 w-4" />
               Экспорт CSV
             </button>
@@ -359,8 +387,8 @@ export default function RepositoriesPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-5 gap-4 mb-6">
           {getStatsData().map((stat) => (
-            <div key={stat.label} className="bg-[#161616] border border-[#2d2d2d] rounded-xl p-4">
-              <p className="text-xs text-[#8b949e] mb-1">{stat.label}</p>
+            <div key={stat.label} className={`${cardBg} border rounded-xl p-4`}>
+              <p className={`text-xs ${tableHeaderText} mb-1`}>{stat.label}</p>
               <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
@@ -370,11 +398,11 @@ export default function RepositoriesPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6e7681]" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${tableHeaderText}`} />
               <input
                 type="text"
                 placeholder="Поиск по наз..."
-                className="w-64 pl-10 pr-4 py-1.5 bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#ccd0d4] placeholder-[#6e7681] focus:outline-none focus:border-[#484f58] transition-colors"
+                className={`w-64 pl-10 pr-4 py-1.5 ${inputBg} rounded-lg text-sm ${inputText} ${inputPlaceholder} focus:outline-none focus:border-[#484f58] transition-colors`}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -383,12 +411,14 @@ export default function RepositoriesPage() {
                 value={typeFilter}
                 options={typeOptions}
                 onChange={setTypeFilter}
+                isDarkTheme={isDarkTheme}
               />
               <Dropdown
                 label="Все статусы"
                 value={blockedFilter}
                 options={blockedOptions}
                 onChange={setBlockedFilter}
+                isDarkTheme={isDarkTheme}
               />
             </div>
           </div>
@@ -401,44 +431,44 @@ export default function RepositoriesPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-[#161616] border border-[#2d2d2d] rounded-xl overflow-hidden">
+        <div className={`${cardBg} rounded-xl overflow-hidden`}>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#2d2d2d]">
+              <tr className={`border-b ${tableBorder}`}>
                 <th className="w-10 py-3 px-4">
-                  <CustomCheckbox checked={selectAll} onChange={toggleSelectAll} />
+                  <CustomCheckbox checked={selectAll} onChange={toggleSelectAll} isDarkTheme={isDarkTheme} />
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Репозиторий
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Тип
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Язык
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Владелец
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Коммиты
                 </th>
-                <th className="py-3 px-4 text-left text-xs font-medium text-[#6e7681] uppercase tracking-wider">
+                <th className={`py-3 px-4 text-left text-xs font-medium ${tableHeaderText} uppercase tracking-wider`}>
                   Статус
                 </th>
                 <th className="w-10 py-3 px-4"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#2d2d2d]">
+            <tbody className={`divide-y ${tableBorder}`}>
               {loading ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-[#6e7681]" />
+                    <Loader2 className={`h-8 w-8 animate-spin mx-auto ${tableHeaderText}`} />
                   </td>
                 </tr>
               ) : repositories.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#6e7681]">
+                  <td colSpan={8} className={`py-12 text-center ${tableHeaderText}`}>
                     Репозитории не найдены
                   </td>
                 </tr>
@@ -446,27 +476,28 @@ export default function RepositoriesPage() {
                 repositories.map((repo) => (
                   <tr
                     key={repo.id}
-                    className={`hover:bg-[#1f2937] transition-colors ${repo.is_blocked ? "opacity-60" : ""}`}
+                    className={`${tableRowHover} transition-colors ${repo.is_blocked ? "opacity-60" : ""}`}
                   >
                     <td className="py-3 px-4">
                       <CustomCheckbox
                         checked={selectedRepos.has(repo.id)}
                         onChange={() => toggleRepo(repo.id)}
+                        isDarkTheme={isDarkTheme}
                       />
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-[#30363d] flex items-center justify-center text-xs font-medium text-[#ccd0d4]">
+                        <div className={`w-8 h-8 rounded ${cardBgLight} flex items-center justify-center text-xs font-medium ${inputText}`}>
                           {getInitials(repo.owner_full_name)}
                         </div>
                         <div>
-                          <p className="font-medium text-[#ccd0d4] text-sm">
+                          <p className={`font-medium text-sm ${inputText}`}>
                             {repo.name}
                             {repo.is_blocked && (
                               <span className="ml-2 text-red-400 text-xs">(заблокирован)</span>
                             )}
                           </p>
-                          <p className="text-xs text-[#6e7681]">{repo.gitea_repo_name || repo.name}</p>
+                          <p className={`text-xs ${tableHeaderText}`}>{repo.gitea_repo_name || repo.name}</p>
                         </div>
                       </div>
                     </td>
@@ -478,16 +509,16 @@ export default function RepositoriesPage() {
                             className="w-2 h-2 rounded-full"
                             style={{ backgroundColor: languageColors[repo.language] || "#6b7280" }}
                           />
-                          <span className="text-sm text-[#8b949e]">{repo.language}</span>
+                          <span className={`text-sm ${textTertiary}`}>{repo.language}</span>
                         </div>
                       ) : (
-                        <span className="text-sm text-[#6e7681]">—</span>
+                        <span className={`text-sm ${tableHeaderText}`}>—</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#8b949e]">
+                    <td className={`py-3 px-4 text-sm ${textTertiary}`}>
                       {repo.owner_full_name || "—"}
                     </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-[#ccd0d4]">
+                    <td className={`py-3 px-4 text-sm font-semibold ${inputText}`}>
                       {repo.commits_count}
                     </td>
                     <td className="py-3 px-4">
@@ -516,8 +547,8 @@ export default function RepositoriesPage() {
                       </button>
                     </td>
                     <td className="py-3 px-4">
-                      <button className="p-1 hover:bg-[#30363d] rounded transition-colors">
-                        <MoreHorizontal className="h-4 w-4 text-[#6e7681]" />
+                      <button className={`p-1 ${btnBg} rounded transition-colors`}>
+                        <MoreHorizontal className={`h-4 w-4 ${tableHeaderText}`} />
                       </button>
                     </td>
                   </tr>
@@ -529,14 +560,14 @@ export default function RepositoriesPage() {
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-[#6e7681]">
+          <p className={`text-sm ${tableHeaderText}`}>
             Показано {repositories.length} из {totalCount}
           </p>
           <div className="flex items-center gap-2">
             {currentPage > 1 && (
               <button
                 onClick={() => setOffset((p) => Math.max(0, p - limit))}
-                className="px-3 py-1.5 bg-[#161616] hover:bg-[#1f2937] border border-[#30363d] text-[#8b949e] text-sm font-medium rounded-lg transition-colors"
+                className={`px-3 py-1.5 ${btnBg} ${btnText} text-sm font-medium rounded-lg transition-colors`}
               >
                 ←
               </button>
@@ -547,21 +578,21 @@ export default function RepositoriesPage() {
             {currentPage < totalPages && (
               <button
                 onClick={() => setOffset((p) => p + limit)}
-                className="px-3 py-1.5 bg-[#161616] hover:bg-[#1f2937] border border-[#30363d] text-[#8b949e] text-sm font-medium rounded-lg transition-colors"
+                className={`px-3 py-1.5 ${btnBg} ${btnText} text-sm font-medium rounded-lg transition-colors`}
               >
                 →
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#6e7681]">По</span>
+            <span className={`text-sm ${tableHeaderText}`}>По</span>
             <select
               value={limit}
               onChange={(e) => {
                 setLimit(Number(e.target.value));
                 setOffset(0);
               }}
-              className="bg-[#0d0d0d] border border-[#30363d] rounded-lg text-sm text-[#8b949e] py-1 px-2 focus:outline-none focus:border-[#484f58]"
+              className={`${inputBg} rounded-lg text-sm ${btnText} py-1 px-2 focus:outline-none focus:border-[#484f58]`}
             >
               {limitOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -569,7 +600,7 @@ export default function RepositoriesPage() {
                 </option>
               ))}
             </select>
-            <span className="text-sm text-[#6e7681]">на странице</span>
+            <span className={`text-sm ${tableHeaderText}`}>на странице</span>
           </div>
         </div>
       </div>

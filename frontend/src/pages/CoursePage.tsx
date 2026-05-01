@@ -5,7 +5,49 @@ import { getMe } from "../api/authApi";
 import { createAssignment, getAssignments, getCourses, deleteAssignment } from "../api/coursesApi";
 import type { Assignment, UserRead } from "../api/types";
 
-export default function CoursePage() {
+interface CoursePageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function CoursePage({ isDarkTheme = true }: CoursePageProps) {
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const pageText = isDarkTheme ? "text-white" : "text-gray-900";
+  const cardBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const cardBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const textSecondary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const textTertiary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const inputBg = isDarkTheme ? "bg-[#0d1117]" : "bg-white";
+  const inputBorder = isDarkTheme ? "border-[#30363d]" : "border-gray-300";
+  const breadcrumbText = isDarkTheme ? "text-purple-400" : "text-purple-700";
+  const breadcrumbHover = isDarkTheme ? "hover:text-purple-300" : "hover:text-purple-800";
+  const buttonPrimary = isDarkTheme ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-600 hover:bg-purple-700 text-white";
+  const buttonSecondary = isDarkTheme ? "border-[#30363d] text-[#8b949e] hover:bg-[#2d2d2d]" : "border-gray-300 text-gray-700 hover:bg-gray-50";
+  const formCard = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const commitCard = isDarkTheme ? "border-[#2d2d2d] bg-[#161616]" : "border-gray-100 bg-gray-50";
+  const errorBox = isDarkTheme ? "border-red-800 bg-red-900/20 text-red-300" : "border-red-200 bg-red-50 text-red-800";
+  const warningBox = isDarkTheme ? "border-yellow-800 bg-yellow-900/20 text-yellow-300" : "border-yellow-200 bg-yellow-50 text-yellow-800";
+  const timelineDot = isDarkTheme ? "bg-purple-500" : "bg-purple-500";
+  const timelineLine = isDarkTheme ? "bg-[#2d2d2d]" : "bg-purple-100";
+  const codeHeader = isDarkTheme ? "border-[#30363d] bg-[#161616] text-[#ccd0d4]" : "border-gray-200 bg-gray-50 text-gray-800";
+  const codeLineNum = isDarkTheme ? "border-[#30363d] text-[#6e7681]" : "border-gray-100 text-gray-500";
+  const avatarBg = isDarkTheme ? "bg-purple-900/30 text-purple-300" : "bg-indigo-100 text-indigo-700";
+  const gaugeBg = isDarkTheme ? "#2d2d2d" : "#e5e7eb";
+  const modalOverlay = isDarkTheme ? "bg-black/60" : "bg-black/40";
+  const modalBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const linkCard = isDarkTheme ? "bg-[#1f2937] border-[#30363d] hover:border-purple-500/50 hover:bg-[#2d2d2d]" : "bg-gray-50 border-gray-200 hover:border-purple-200 hover:bg-white";
+  const badgeActive = isDarkTheme ? "bg-purple-900/30 text-purple-300" : "bg-purple-100 text-purple-700";
+  const deleteBtn = isDarkTheme ? "bg-red-900/30 text-red-300 hover:bg-red-900/50" : "bg-red-100 text-red-700 hover:bg-red-200";
+  const tabActiveBg = isDarkTheme ? "border-purple-500/30 bg-purple-600/20 text-purple-300" : "border-purple-200 bg-purple-100 text-purple-700";
+  const tabInactiveBg = isDarkTheme ? "border-[#30363d] bg-transparent text-[#8b949e] hover:border-purple-500/30 hover:text-purple-300" : "border-gray-200 bg-white text-gray-700 hover:border-purple-200 hover:text-purple-700";
+  const penaltyBox = isDarkTheme ? "border-[#30363d] bg-[#1f2937]" : "border-gray-200 bg-gray-50";
+  const commitHash = isDarkTheme ? "text-purple-400" : "text-purple-700";
+
+  // Form accent colors
+  const todayBtn = isDarkTheme ? "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50" : "bg-purple-100 text-purple-700 hover:bg-purple-200";
+  const fileItem = isDarkTheme ? "bg-[#1f2937] text-[#ccd0d4]" : "bg-gray-50 text-gray-700";
+  const penaltyDeleteBtn = isDarkTheme ? "border-red-800 text-red-300 hover:bg-red-900/20" : "border-red-200 text-red-700 hover:bg-red-50";
   const { courseId } = useParams();
   const today = useMemo(() => {
     // Get Moscow date (UTC+3)
@@ -178,21 +220,21 @@ export default function CoursePage() {
   if (!courseId) return null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4">
-      <div className="mb-3 text-sm text-gray-600">
-        <Link to="/courses" className="text-purple-700 hover:text-purple-800">
+    <div className={`mx-auto max-w-7xl px-4 ${pageBg} min-h-screen py-4`}>
+      <div className={`mb-3 text-sm ${textSecondary}`}>
+        <Link to="/courses" className={`${breadcrumbText} ${breadcrumbHover}`}>
           Курсы
         </Link>
-        <span className="mx-2 text-gray-400">&gt;</span>
-        <span className="font-medium text-gray-800">{courseTitle ?? "Курс"}</span>
+        <span className={`mx-2 ${textTertiary}`}>&gt;</span>
+        <span className={`font-medium ${textPrimary}`}>{courseTitle ?? "Курс"}</span>
       </div>
 
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-semibold text-gray-900">{courseTitle ?? "Курс"}</h1>
+        <h1 className={`text-3xl font-semibold ${textPrimary}`}>{courseTitle ?? "Курс"}</h1>
         {canCreateAssignment ? (
           <button
             onClick={() => setShowCreateForm((v) => !v)}
-            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700"
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${buttonPrimary}`}
           >
             {showCreateForm ? "Скрыть форму" : "Создать задание"}
           </button>
@@ -202,26 +244,26 @@ export default function CoursePage() {
       {showCreateForm && canCreateAssignment ? (
         <form
           onSubmit={onCreateAssignment}
-          className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-md"
+          className={`mb-6 rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}
         >
-          <div className="mb-3 text-sm font-semibold text-gray-900">Новое задание</div>
+          <div className={`mb-3 text-sm font-semibold ${textPrimary}`}>Новое задание</div>
           <div className="grid gap-3">
             <input
               type="text"
               placeholder="title"
               value={createTitle}
               onChange={(e) => setCreateTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+              className={`w-full rounded-lg border ${inputBorder} px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
               required
             />
             <textarea
               placeholder="description"
               value={createDescription}
               onChange={(e) => setCreateDescription(e.target.value)}
-              className="min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+              className={`min-h-24 w-full rounded-lg border ${inputBorder} px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
             />
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Файлы задания</label>
+              <label className={`mb-1 block text-sm font-medium ${textSecondary}`}>Файлы задания</label>
               <input
                 type="file"
                 multiple
@@ -229,17 +271,17 @@ export default function CoursePage() {
                   const files = Array.from(e.target.files || []);
                   setCreateFiles(files);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-purple-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-purple-700 hover:file:bg-purple-200"
+                className={`w-full rounded-lg border ${inputBorder} px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-purple-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-purple-700 hover:file:bg-purple-200 ${inputBg} ${textPrimary}`}
               />
               {createFiles.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {createFiles.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1 text-sm text-gray-700">
+                    <div key={idx} className={`flex items-center justify-between rounded-md px-3 py-1 text-sm ${fileItem}`}>
                       <span className="truncate">{file.name}</span>
                       <button
                         type="button"
                         onClick={() => setCreateFiles((prev) => prev.filter((_, i) => i !== idx))}
-                        className="ml-2 text-red-600 hover:text-red-800"
+                        className={`ml-2 ${isDarkTheme ? "text-red-400 hover:text-red-300" : "text-red-600 hover:text-red-800"}`}
                       >
                         ✕
                       </button>
@@ -249,26 +291,26 @@ export default function CoursePage() {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Дата начала</label>
+              <label className={`mb-1 block text-sm font-medium ${textSecondary}`}>Дата начала</label>
               <div className="relative flex items-center">
                 <input
                   type="date"
                   value={createStartDate}
                   onChange={(e) => setCreateStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-24 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  className={`w-full rounded-lg border ${inputBorder} px-3 py-2 pr-24 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setCreateStartDate(today)}
-                  className="absolute right-2 rounded-md bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-200 transition"
+                  className={`absolute right-2 rounded-md px-3 py-1 text-xs font-medium transition ${todayBtn}`}
                 >
                   Сегодня
                 </button>
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Дедлайн</label>
+              <label className={`mb-1 block text-sm font-medium ${textSecondary}`}>Дедлайн</label>
               <input
                 type="datetime-local"
                 value={createDeadline}
@@ -286,13 +328,13 @@ export default function CoursePage() {
                   setCreateDeadline(value);
                 }}
                 min={`${today}T00:00`}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                className={`w-full rounded-lg border ${inputBorder} px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                 required
               />
             </div>
-            <div className="rounded-lg border border-gray-200 p-3">
+            <div className={`rounded-lg border ${cardBorder} p-3`}>
               <div className="mb-2 flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">Штрафы за просрочку</label>
+                <label className={`text-sm font-medium ${textSecondary}`}>Штрафы за просрочку</label>
                 <button
                   type="button"
                   onClick={() =>
@@ -304,7 +346,7 @@ export default function CoursePage() {
                       },
                     ])
                   }
-                  className="rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 hover:bg-purple-200"
+                  className={`rounded-md px-2 py-1 text-xs font-medium transition ${todayBtn}`}
                 >
                   Добавить период штрафа
                 </button>
@@ -334,7 +376,7 @@ export default function CoursePage() {
                           prev.map((p, i) => (i === idx ? { ...p, weeks: nextWeeks } : p)),
                         );
                       }}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      className={`rounded-lg border ${inputBorder} px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                       placeholder="до X недель"
                       required
                     />
@@ -359,14 +401,14 @@ export default function CoursePage() {
                           prev.map((p, i) => (i === idx ? { ...p, max_grade: nextMax } : p)),
                         );
                       }}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      className={`rounded-lg border ${inputBorder} px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
                       placeholder="максимальная оценка"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setLatePenaltyPeriods((prev) => prev.filter((_, i) => i !== idx))}
-                      className="rounded-lg border border-red-200 px-3 py-2 text-xs text-red-700 hover:bg-red-50"
+                      className={`rounded-lg border px-3 py-2 text-xs ${penaltyDeleteBtn}`}
                       disabled={latePenaltyPeriods.length === 1}
                     >
                       Удалить
@@ -375,24 +417,24 @@ export default function CoursePage() {
                 ))}
               </div>
 
-              <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
-                <div className="mb-1 font-medium text-gray-700">Периоды:</div>
+              <div className={`mt-3 rounded-lg p-3 text-sm ${penaltyBox}`}>
+                <div className={`mb-1 font-medium ${textSecondary}`}>Периоды:</div>
                 {sortedLatePenaltyPeriods.map((p, idx) => (
-                    <div key={`${p.weeks}-${idx}`} className="text-gray-600">
+                    <div key={`${p.weeks}-${idx}`} className={textTertiary}>
                       До {p.weeks} недели → макс. {p.max_grade}
                     </div>
                   ))}
-                <div className="mt-1 text-gray-700">Позже → макс. 0</div>
+                <div className={`mt-1 ${textPrimary}`}>Позже → макс. 0</div>
               </div>
               {penaltyValidationError ? (
-                <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+                <div className={`mt-2 rounded-md border p-2 text-xs ${errorBox}`}>
                   {penaltyValidationError}
                 </div>
               ) : null}
             </div>
           </div>
           {createError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
               {createError}
             </div>
           ) : null}
@@ -400,14 +442,14 @@ export default function CoursePage() {
             <button
               type="button"
               onClick={() => setShowCreateForm(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${buttonSecondary}`}
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={createLoading || !!penaltyValidationError}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700 disabled:opacity-50"
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${buttonPrimary}`}
             >
               {createLoading ? "Создание..." : "Создать"}
             </button>
@@ -415,40 +457,40 @@ export default function CoursePage() {
         </form>
       ) : null}
 
-      {loading ? <div className="text-sm text-gray-600">Loading...</div> : null}
+      {loading ? <div className={`text-sm ${textSecondary}`}>Loading...</div> : null}
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md">
-        <div className="mb-3 text-lg font-semibold text-gray-900">Задания</div>
+      <div className={`rounded-xl border ${cardBorder} ${cardBg} p-4 shadow-md`}>
+        <div className={`mb-3 text-lg font-semibold ${textPrimary}`}>Задания</div>
         <div className="space-y-3">
         {assignments.map((a) => (
           <div key={a.id} className="group relative">
             <Link
               to={`/courses/${courseId}/assignments/${a.id}`}
-              className="block rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:border-purple-200 hover:bg-white"
+              className={`block rounded-xl border p-4 transition ${linkCard}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <div className={`flex items-center gap-2 text-base font-semibold ${textPrimary}`}>
                     <span>📘</span>
                     <span className="truncate">{a.title}</span>
                   </div>
                   {a.description ? (
-                    <div className="mt-1 text-sm text-gray-600 line-clamp-3">
+                    <div className={`mt-1 text-sm line-clamp-3 ${textSecondary}`}>
                       {a.description}
                     </div>
                   ) : null}
                 </div>
-                <div className="text-right text-sm text-gray-700">
+                <div className={`text-right text-sm ${textSecondary}`}>
                   <div>
                     Дедлайн: <span className="font-medium">{new Date(a.deadline).toLocaleString()}</span>
                   </div>
                   <div className="mt-1">
-                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeActive}`}>
                       Активно
                     </span>
                   </div>
@@ -458,7 +500,7 @@ export default function CoursePage() {
             {canCreateAssignment && (
               <button
                 onClick={() => handleDeleteAssignment(a.id)}
-                className="absolute right-2 top-2 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700 opacity-0 transition hover:bg-red-200 group-hover:opacity-100"
+                className={`absolute right-2 top-2 rounded-md px-2 py-1 text-xs font-medium opacity-0 transition group-hover:opacity-100 ${deleteBtn}`}
                 title="Удалить задание"
               >
                 🗑️
@@ -470,7 +512,7 @@ export default function CoursePage() {
       </div>
 
       {!loading && !error && assignments.length === 0 ? (
-        <div className="mt-6 text-sm text-gray-600">No assignments found.</div>
+        <div className={`mt-6 text-sm ${textSecondary}`}>No assignments found.</div>
       ) : null}
     </div>
   );

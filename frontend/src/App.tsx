@@ -65,14 +65,14 @@ export default function App() {
             <Suspense fallback={<div className={`mx-auto max-w-7xl px-4 text-sm ${isDarkTheme ? "text-gray-600" : "text-gray-400"}`}>Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Navigate to="/home" replace />} />
-                <Route path="/home" element={<HomePage />} />
+                <Route path="/home" element={<HomePage isDarkTheme={isDarkTheme} />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                 <Route element={<AuthRequired />}>
-                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/profile" element={<ProfilePage isDarkTheme={isDarkTheme} />} />
                   <Route path="/courses" element={<CoursesPage />} />
                   <Route path="/courses/:courseId" element={<CoursePage />} />
                   <Route
@@ -80,23 +80,23 @@ export default function App() {
                     element={<AssignmentPage />}
                   />
                   {/* Placeholder routes for new sidebar items */}
-                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/dashboard" element={<DashboardPage isDarkTheme={isDarkTheme} />} />
                   <Route path="/projects" element={<CoursesPage />} />
-                  <Route path="/repositories" element={<RepositoriesPage />} />
+                  <Route path="/repositories" element={<RepositoriesPage isDarkTheme={isDarkTheme} />} />
                   <Route path="/assignments" element={<CoursesPage />} />
-                  <Route path="/grades" element={<ProfilePage />} />
+                  <Route path="/grades" element={<ProfilePage isDarkTheme={isDarkTheme} />} />
                   <Route path="/submissions" element={<CoursesPage />} />
                   <Route path="/students" element={<CoursesPage />} />
-                  <Route path="/logs" element={<LogsPage />} />
-                  <Route path="/settings" element={<ProfilePage />} />
+                  <Route path="/logs" element={<LogsPage isDarkTheme={isDarkTheme} />} />
+                  <Route path="/settings" element={<ProfilePage isDarkTheme={isDarkTheme} />} />
                   <Route element={<AdminRequired />}>
                     <Route path="/admin" element={<AdminPage isDarkTheme={isDarkTheme} />} />
                     <Route path="/users" element={<UsersPage isDarkTheme={isDarkTheme} />} />
                     <Route path="/roles" element={<RolesPage isDarkTheme={isDarkTheme} />} />
-                    <Route path="/admin/forks" element={<ForksPage />} />
-                    <Route path="/admin/activity" element={<ActivityPage />} />
-                    <Route path="/admin/monitoring" element={<MonitoringPage />} />
-                    <Route path="/admin/settings" element={<AdminSettingsPage />} />
+                    <Route path="/admin/forks" element={<ForksPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/admin/activity" element={<ActivityPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/admin/monitoring" element={<MonitoringPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/admin/settings" element={<AdminSettingsPage isDarkTheme={isDarkTheme} />} />
                   </Route>
                 </Route>
 

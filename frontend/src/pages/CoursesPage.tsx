@@ -5,7 +5,32 @@ import { getMe } from "../api/authApi";
 import { createCourse, deleteCourse, getCourses, getGroups } from "../api/coursesApi";
 import type { Course, UserRead } from "../api/types";
 
-export default function CoursesPage() {
+interface CoursesPageProps {
+  isDarkTheme?: boolean;
+}
+
+export default function CoursesPage({ isDarkTheme = true }: CoursesPageProps) {
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const pageText = isDarkTheme ? "text-white" : "text-gray-900";
+  const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const textSecondary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const textTertiary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const cardBg = isDarkTheme ? "bg-[#161616]" : "bg-white";
+  const cardBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const inputBg = isDarkTheme ? "bg-[#0d1117]" : "bg-white";
+  const inputBorder = isDarkTheme ? "border-[#30363d]" : "border-gray-300";
+  const buttonPrimary = isDarkTheme ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-600 hover:bg-purple-700 text-white";
+  const buttonSecondary = isDarkTheme ? "border-[#30363d] text-[#8b949e] hover:bg-[#2d2d2d]" : "border-gray-300 text-gray-700 hover:bg-gray-50";
+  const errorBox = isDarkTheme ? "border-red-800 bg-red-900/20 text-red-300" : "border-red-200 bg-red-50 text-red-800";
+  const infoBox = isDarkTheme ? "border-purple-800/50 bg-purple-900/20 text-purple-300" : "border-purple-100 bg-purple-50 text-purple-800";
+  const badgeBg = isDarkTheme ? "bg-[#1f2937]" : "bg-gray-50";
+  const gradeBadge = isDarkTheme ? "bg-purple-900/30 text-purple-300" : "bg-purple-50 text-purple-700";
+  const deleteBtn = isDarkTheme ? "border-red-800 text-red-300 hover:bg-red-900/20" : "border-red-200 text-red-700 hover:bg-red-50";
+  const groupChipActive = isDarkTheme ? "border-purple-500 bg-purple-600/20 text-purple-300" : "border-purple-500 bg-purple-50 text-purple-700";
+  const groupChipInactive = isDarkTheme ? "border-[#30363d] bg-[#161616] text-[#8b949e] hover:border-purple-500/50" : "border-gray-200 bg-white text-gray-600 hover:border-purple-300";
+  const linkCard = isDarkTheme ? "hover:border-purple-500/50 hover:-translate-y-1" : "hover:border-purple-200 hover:-translate-y-1";
+
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -116,13 +141,13 @@ export default function CoursesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4">
+    <div className={`mx-auto max-w-7xl px-4 ${pageBg} min-h-screen py-4`}>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-semibold text-gray-900">Мои курсы</h1>
+        <h1 className={`text-3xl font-semibold ${textPrimary}`}>Мои курсы</h1>
         {canCreateCourse ? (
           <button
             onClick={() => setShowCreateForm((v) => !v)}
-            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700"
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${buttonPrimary}`}
           >
             {showCreateForm ? "Скрыть форму" : "Создать курс"}
           </button>
@@ -132,25 +157,25 @@ export default function CoursesPage() {
       {showCreateForm && canCreateCourse ? (
         <form
           onSubmit={onCreateCourse}
-          className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-md"
+          className={`mb-6 rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md`}
         >
-          <div className="mb-3 text-sm font-semibold text-gray-900">Новый курс</div>
+          <div className={`mb-3 text-sm font-semibold ${textPrimary}`}>Новый курс</div>
           <div className="grid gap-3">
             <input
               type="text"
               placeholder="title"
               value={createTitle}
               onChange={(e) => setCreateTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+              className={`w-full rounded-lg border ${inputBorder} px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
               required
             />
             <textarea
               placeholder="description"
               value={createDescription}
               onChange={(e) => setCreateDescription(e.target.value)}
-              className="min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+              className={`min-h-24 w-full rounded-lg border ${inputBorder} px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 ${inputBg} ${textPrimary}`}
             />
-            <div className="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-800">
+            <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${infoBox}`}>
               Максимальная оценка: {createGradeMax}
             </div>
             <input
@@ -161,7 +186,7 @@ export default function CoursesPage() {
               list="grade-marks"
               value={createGradeMax}
               onChange={(e) => setCreateGradeMax(Number(e.target.value))}
-              className="w-full accent-purple-600"
+              className={`w-full ${isDarkTheme ? "accent-purple-500" : "accent-purple-600"}`}
               required
             />
             <datalist id="grade-marks">
@@ -177,7 +202,7 @@ export default function CoursesPage() {
               <option value="45">45</option>
               <option value="50">50</option>
             </datalist>
-            <div className="mt-1 flex justify-between text-xs text-gray-500">
+            <div className={`mt-1 flex justify-between text-xs ${textTertiary}`}>
               <span>0</span>
               <span>5</span>
               <span>10</span>
@@ -190,19 +215,17 @@ export default function CoursesPage() {
               <span>45</span>
               <span>50</span>
             </div>
-            
+
             {/* Groups selection */}
             {availableGroups.length > 0 && (
               <div className="mt-4">
-                <div className="mb-2 text-sm font-medium text-gray-700">Доступные группы:</div>
+                <div className={`mb-2 text-sm font-medium ${textSecondary}`}>Доступные группы:</div>
                 <div className="flex flex-wrap gap-2">
                   {availableGroups.map((group) => (
                     <label
                       key={group}
                       className={`cursor-pointer rounded-lg border px-3 py-1.5 text-sm transition ${
-                        selectedGroups.includes(group)
-                          ? "border-purple-500 bg-purple-50 text-purple-700"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-purple-300"
+                        selectedGroups.includes(group) ? groupChipActive : groupChipInactive
                       }`}
                     >
                       <input
@@ -222,7 +245,7 @@ export default function CoursesPage() {
                   ))}
                 </div>
                 {selectedGroups.length === 0 && (
-                  <div className="mt-1 text-xs text-gray-400">
+                  <div className={`mt-1 text-xs ${textTertiary}`}>
                     Если не выбрано ни одной группы, курс будет доступен всем
                   </div>
                 )}
@@ -230,7 +253,7 @@ export default function CoursesPage() {
             )}
           </div>
           {createError ? (
-            <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className={`mt-3 rounded-md border p-3 text-sm ${errorBox}`}>
               {createError}
             </div>
           ) : null}
@@ -238,7 +261,7 @@ export default function CoursesPage() {
             <button
               type="submit"
               disabled={createLoading}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700 disabled:opacity-60"
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${buttonPrimary}`}
             >
               {createLoading ? "Создание..." : "Создать"}
             </button>
@@ -246,9 +269,9 @@ export default function CoursesPage() {
         </form>
       ) : null}
 
-      {loading ? <div className="text-sm text-gray-600">Loading...</div> : null}
+      {loading ? <div className={`text-sm ${textSecondary}`}>Loading...</div> : null}
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className={`rounded-md border p-3 text-sm ${errorBox}`}>
           {error}
         </div>
       ) : null}
@@ -257,19 +280,19 @@ export default function CoursesPage() {
         {courses.map((c) => (
           <div
             key={c.id}
-            className="rounded-xl border border-gray-200 bg-white p-5 shadow-md transition duration-200 hover:-translate-y-1 hover:border-purple-200"
+            className={`rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-md transition duration-200 ${linkCard}`}
           >
             <div className="flex items-start justify-between gap-3">
               <Link to={`/courses/${c.id}`} className="min-w-0 flex-1">
-                <div className="text-base font-semibold text-gray-900">{c.title}</div>
+                <div className={`text-base font-semibold ${textPrimary}`}>{c.title}</div>
                 {c.description ? (
-                  <div className="mt-1 text-sm text-gray-600 line-clamp-3">
+                  <div className={`mt-1 text-sm line-clamp-3 ${textSecondary}`}>
                     {c.description}
                   </div>
                 ) : null}
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div className="rounded-md bg-gray-50 px-2 py-1">Студентов: {c.enrolled_count ?? 0}</div>
-                  <div className="rounded-md bg-purple-50 px-2 py-1 text-purple-700">
+                <div className={`mt-4 grid grid-cols-2 gap-2 text-xs ${textSecondary}`}>
+                  <div className={`rounded-md px-2 py-1 ${badgeBg}`}>Студентов: {c.enrolled_count ?? 0}</div>
+                  <div className={`rounded-md px-2 py-1 ${gradeBadge}`}>
                     Макс. оценка: {c.grade_max}
                   </div>
                 </div>
@@ -281,7 +304,7 @@ export default function CoursesPage() {
                   title="Удалить курс"
                   onClick={() => onDeleteCourse(c.id)}
                   disabled={deletingCourseId === c.id}
-                  className="rounded-lg border border-red-200 px-2 py-1 text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                  className={`rounded-lg border px-2 py-1 transition disabled:opacity-60 ${deleteBtn}`}
                 >
                   🗑️
                 </button>
@@ -292,7 +315,7 @@ export default function CoursesPage() {
       </div>
 
       {!loading && !error && courses.length === 0 ? (
-        <div className="mt-6 text-sm text-gray-600">No courses found.</div>
+        <div className={`mt-6 text-sm ${textSecondary}`}>No courses found.</div>
       ) : null}
     </div>
   );
