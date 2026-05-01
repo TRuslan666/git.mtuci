@@ -3,8 +3,9 @@ interface DashboardPageProps {
 }
 
 export default function DashboardPage({ isDarkTheme = false }: DashboardPageProps) {
-  console.log("DashboardPage isDarkTheme:", isDarkTheme);
-  const pageBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-slate-50";
+  console.log("DashboardPage isDarkTheme:", isDarkTheme, "type:", typeof isDarkTheme);
+  const isDark = Boolean(isDarkTheme);
+  const pageBg = isDark ? "bg-[#0f0f10]" : "bg-slate-50";
   const titleText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
   const bodyText = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
 

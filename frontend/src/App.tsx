@@ -31,7 +31,7 @@ const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 
 const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
-const ADMIN_PATHS = ["/admin", "/users", "/roles", "/admin/forks", "/admin/activity", "/admin/monitoring", "/admin/settings", "/repositories"];
+const ADMIN_PATHS = ["/admin", "/users", "/roles", "/admin/forks", "/admin/activity", "/admin/monitoring", "/admin/settings", "/repositories", "/logs"];
 
 export default function App() {
   const location = useLocation();
@@ -41,7 +41,7 @@ export default function App() {
   // Theme state
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     const saved = localStorage.getItem("theme");
-    return saved ? saved === "dark" : true;
+    return saved ? saved === "dark" : false;
   });
 
   useEffect(() => {
