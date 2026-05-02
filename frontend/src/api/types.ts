@@ -12,6 +12,7 @@ export interface UserRead {
   email: string;
   full_name: string;
   role: UserRole;
+  is_blocked: boolean;
   avatar_url: string | null;
   avatar_display_mode: "cover" | "contain" | "fill" | "scale-down";
   created_at: string;
@@ -27,6 +28,7 @@ export interface AdminUserRead {
   student_id: string | null;
   is_blocked: boolean;
   is_pending?: boolean;
+  avatar_url: string | null;
   created_at: string;
   last_login: string | null;
 }

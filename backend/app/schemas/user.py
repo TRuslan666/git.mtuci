@@ -15,6 +15,7 @@ class UserRead(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    is_blocked: bool = False
     group_name: str | None = None
     student_id: str | None = None
     avatar_url: str | None = None
@@ -43,6 +44,7 @@ class AdminUserRead(BaseModel):
     is_pending: bool
     group_name: str | None = None
     student_id: str | None = None
+    avatar_url: str | None = None
     created_at: datetime
     last_login: datetime | None = None
 

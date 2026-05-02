@@ -11,6 +11,30 @@ interface ProfilePageProps {
   isDarkTheme?: boolean;
 }
 
+// Helper для форматирования последнего входа
+function formatLastLogin(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  // Compare dates in Moscow timezone
+  const moscowDate = new Date(date.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
+  const moscowNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
+  const isToday = moscowDate.getDate() === moscowNow.getDate() &&
+                  moscowDate.getMonth() === moscowNow.getMonth() &&
+                  moscowDate.getFullYear() === moscowNow.getFullYear();
+  
+  const timeStr = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" });
+  
+  if (isToday) {
+    return `Сегодня, ${timeStr}`;
+  }
+  
+  const dateStr_formatted = date.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" });
+  return `${dateStr_formatted}, ${timeStr}`;
+}
+
 // Цвета по ТЗ
 const colors = {
   pageBg: "#111111",
@@ -360,7 +384,7 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
                 borderBottom: `1px solid ${colors.border}`
               }}>
                 <span style={{ color: colors.textSecondary, fontSize: "11px" }}>Имя</span>
-                <span style={{ color: colors.textPrimary, fontSize: "11px" }}>{me?.name || me?.login || "-"}</span>
+                <span style={{ color: colors.textPrimary, fontSize: "11px" }}>{me?.full_name || "-"}</span>
               </div>
 
               {/* Email */}
@@ -410,18 +434,24 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
                 borderBottom: `1px solid ${colors.border}`
               }}>
                 <span style={{ color: colors.textSecondary, fontSize: "11px" }}>Последний вход</span>
-                <span style={{ color: colors.textPrimary, fontSize: "11px" }}>{me?.last_login ? new Date(me.last_login).toLocaleDateString("ru-RU") : "—"}</span>
+                <span style={{ color: colors.textPrimary, fontSize: "11px" }}>{formatLastLogin(me?.last_login || null)}</span>
               </div>
 
               {/* Статус */}
-              <div style={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
                 alignItems: "center",
                 padding: "8px 0 0 0"
               }}>
                 <span style={{ color: colors.textSecondary, fontSize: "11px" }}>Статус</span>
-                <span style={{ color: "#22c55e", fontSize: "11px", fontWeight: "500" }}>Активен</span>
+                <span style={{
+                  color: me?.is_blocked ? "#ef4444" : "#22c55e",
+                  fontSize: "11px",
+                  fontWeight: "500"
+                }}>
+                  {me?.is_blocked ? "Заблокирован" : "Активен"}
+                </span>
               </div>
             </div>
           </div>

@@ -36,6 +36,7 @@ interface User {
   status: "active" | "pending" | "blocked";
   repos: number;
   lastLogin: string;
+  avatar_url: string | null;
 }
 
 function getRoleBadge(role: User["role"], isDarkTheme: boolean) {
@@ -294,6 +295,7 @@ export default function UsersPage({ isDarkTheme = false }: UsersPageProps) {
           .join("")
           .toUpperCase(),
         color: "bg-blue-500",
+        avatar_url: u.avatar_url || null,
       }))
     );
     setTotalUsers(res.length);
@@ -337,6 +339,7 @@ useEffect(() => {
             .toUpperCase(),
 
           color: "bg-blue-500",
+          avatar_url: u.avatar_url || null,
         }))
       );
 
@@ -715,9 +718,17 @@ useEffect(() => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className={`h-9 w-9 rounded-full ${user.color} flex items-center justify-center text-sm font-medium text-white`}>
-                        {user.initials}
-                      </div>
+                      {user.avatar_url ? (
+                        <img
+                          src={user.avatar_url}
+                          alt={user.initials}
+                          className="h-9 w-9 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className={`h-9 w-9 rounded-full ${user.color} flex items-center justify-center text-sm font-medium text-white`}>
+                          {user.initials}
+                        </div>
+                      )}
                       <div>
                         <p className={`text-sm font-medium ${tableNameText}`}>{user.name}</p>
                         <p className={`text-xs ${tableEmailText}`}>{user.email}</p>
