@@ -158,6 +158,64 @@ def get_initials(full_name: str) -> str:
     return full_name[:2].upper() if full_name else "??"
 
 
+@router.get("/total-users")
+async def get_total_users(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Get total count of registered users."""
+    # Debug: check if users exist
+    result = await session.execute(select(func.count()).select_from(User))
+    raw_count = result.scalar()
+    
+    # Also fetch actual users to debug
+    users_result = await session.execute(select(User.id, User.email).limit(5))
+    users_sample = users_result.all()
+    
+    print(f"[DEBUG] Total users count (raw): {raw_count}")
+    print(f"[DEBUG] Sample users: {users_sample}")
+    
+    total = raw_count or 0
+    return {"total_users": total, "debug_sample": len(users_sample)}
+
+
+@router.get("/my-commits")
+async def get_my_commits(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Get total commit count for current user across all their repositories.
+    """
+    # Get user's repositories
+    result = await session.execute(
+        select(Repository)
+        .where(Repository.owner_id == current_user.id)
+        .where(Repository.gitea_repo_name.is_not(None))
+    )
+    repos = result.scalars().all()
+    
+    total_commits = 0
+    for repo in repos:
+        if repo.gitea_repo_name:
+            try:
+                commits_raw, _ = await list_repo_commits(
+                    owner=GITEA_ADMIN_USERNAME,
+                    repo=repo.gitea_repo_name,
+                    limit=100,
+                    max_pages=10,
+                )
+                total_commits += len(commits_raw)
+            except Exception:
+                # Gitea unavailable or repo doesn't exist
+                pass
+    
+    return {
+        "commits": total_commits,
+        "repositories": len(repos),
+    }
+
+
 @router.get("/active-repositories", response_model=list[ActiveRepositoryStat])
 @require_permission("logs_view")
 async def get_active_repositories(

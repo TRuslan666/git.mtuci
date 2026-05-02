@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import type { FormEvent } from "react";
 import { changeMyPassword, getMe, uploadAvatarWithMode } from "../api/authApi";
+import { getMyRepositories } from "../api/repositoriesApi";
+import { getMyCommits, getTotalUsers } from "../api/adminApi";
 import type { UserRead } from "../api/types";
 import AvatarUploadModal from "../components/AvatarUploadModal";
 import { GitBranch, Users, GitCommit, Shield, Mail, User, Calendar } from "lucide-react";
@@ -18,22 +20,6 @@ const colors = {
   textPrimary: "#e6e6e6",
   textSecondary: "#888888",
 };
-
-// Статические данные для демо
-const stats = {
-  repositories: 12,
-  users: 2,
-  commits: 156,
-};
-
-// Функция склонения слов
-function pluralize(n: number, forms: [string, string, string]): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return forms[0];
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
-  return forms[2];
-}
 
 // Последние действия (демо)
 const recentActions = [
@@ -53,6 +39,7 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [stats, setStats] = useState({ repositories: 0, commits: 0, users: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -96,8 +83,20 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
     async function loadMe() {
       setLoading(true);
       try {
-        const meData = await getMe();
-        if (!cancelled) setMe(meData);
+        const [meData, repos, myCommits, totalUsers] = await Promise.all([
+          getMe(),
+          getMyRepositories().catch(() => []),
+          getMyCommits().catch(() => ({ commits: 0, repositories: 0 })),
+          getTotalUsers().catch(() => ({ total_users: 0 })),
+        ]);
+        if (!cancelled) {
+          setMe(meData);
+          setStats({
+            repositories: repos.length,
+            commits: myCommits.commits,
+            users: totalUsers.total_users,
+          });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -272,18 +271,18 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
             </div>
 
             {/* Горизонтальный разделитель */}
-            <div style={{ 
-              height: "1px", 
-              backgroundColor: colors.border, 
-              marginBottom: "16px" 
+            <div style={{
+              height: "1px",
+              backgroundColor: colors.border,
+              marginBottom: "16px"
             }} />
 
-            {/* Блок статистики — 3 карточки с темным фоном (вдавленность) */}
+            {/* Блок статистики — реальные данные */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-              {/* Репозитории — темный фон */}
-              <div style={{ 
-                backgroundColor: "#0a0a0a", 
-                borderRadius: "6px", 
+              {/* Репозитории */}
+              <div style={{
+                backgroundColor: "#0a0a0a",
+                borderRadius: "6px",
                 padding: "16px 12px",
                 textAlign: "center"
               }}>
@@ -291,14 +290,14 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
                   {stats.repositories}
                 </div>
                 <div style={{ color: colors.textSecondary, fontSize: "10px" }}>
-                  {pluralize(stats.repositories, ['Репозиторий', 'Репозитория', 'Репозиториев'])}
+                  {stats.repositories === 1 ? "Репозиторий" : stats.repositories >= 2 && stats.repositories <= 4 ? "Репозитория" : "Репозиториев"}
                 </div>
               </div>
 
-              {/* Пользователи — темный фон */}
-              <div style={{ 
-                backgroundColor: "#0a0a0a", 
-                borderRadius: "6px", 
+              {/* Пользователи — реальные данные */}
+              <div style={{
+                backgroundColor: "#0a0a0a",
+                borderRadius: "6px",
                 padding: "16px 12px",
                 textAlign: "center"
               }}>
@@ -306,14 +305,14 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
                   {stats.users}
                 </div>
                 <div style={{ color: colors.textSecondary, fontSize: "10px" }}>
-                  {pluralize(stats.users, ['Пользователь', 'Пользователя', 'Пользователей'])}
+                  {stats.users === 1 ? "Пользователь" : stats.users >= 2 && stats.users <= 4 ? "Пользователя" : "Пользователей"}
                 </div>
               </div>
 
-              {/* Коммиты — темный фон */}
-              <div style={{ 
-                backgroundColor: "#0a0a0a", 
-                borderRadius: "6px", 
+              {/* Коммиты — пока 0, нет API */}
+              <div style={{
+                backgroundColor: "#0a0a0a",
+                borderRadius: "6px",
                 padding: "16px 12px",
                 textAlign: "center"
               }}>
@@ -321,10 +320,11 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
                   {stats.commits}
                 </div>
                 <div style={{ color: colors.textSecondary, fontSize: "10px" }}>
-                  {pluralize(stats.commits, ['Коммит', 'Коммита', 'Коммитов'])}
+                  {stats.commits === 1 ? "Коммит" : stats.commits >= 2 && stats.commits <= 4 && stats.commits !== 0 ? "Коммита" : "Коммитов"}
                 </div>
               </div>
             </div>
+
           </div>
 
           {/* Блок ИНФОРМАЦИЯ */}
@@ -586,7 +586,6 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
             border: `1px solid ${colors.border}`, 
             borderRadius: "12px", 
             padding: "16px 20px",
-            marginTop: "16px"
           }}>
             {/* Заголовок */}
             <div style={{ 

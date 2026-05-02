@@ -80,6 +80,23 @@ export async function getCommitsByFaculty(): Promise<FacultyCommitsStat[]> {
   return apiRequest<FacultyCommitsStat[]>("/stats/commits-by-faculty");
 }
 
+export interface MyCommitsResponse {
+  commits: number;
+  repositories: number;
+}
+
+export async function getMyCommits(): Promise<MyCommitsResponse> {
+  return apiRequest<MyCommitsResponse>("/stats/my-commits");
+}
+
+export interface TotalUsersResponse {
+  total_users: number;
+}
+
+export async function getTotalUsers(): Promise<TotalUsersResponse> {
+  return apiRequest<TotalUsersResponse>("/stats/total-users");
+}
+
 export interface ActiveRepositoryStat {
   id: string;
   name: string;
