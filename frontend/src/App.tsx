@@ -4,8 +4,7 @@ import { useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import AuthRequired from "./components/AuthRequired";
 import AdminRequired from "./components/AdminRequired";
-import NavBar from "./components/NavBar";
-import AdminHeader from "./components/AdminHeader";
+import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import Footer from "./components/Footer";
 import { PendingCountProvider } from "./context/PendingCountContext";
@@ -56,8 +55,8 @@ export default function App() {
 
   return (
     <PendingCountProvider>
-    <div className="h-screen flex flex-col" style={appBgStyle}>
-      {!isAuthPage && (isAdminPage ? <AdminHeader isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} /> : <NavBar isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />)}
+    <div className={`h-screen flex flex-col ${isDarkTheme ? "text-white" : "text-gray-900"}`} style={appBgStyle}>
+      {!isAuthPage && <Header isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />}
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
         {!isAuthPage ? <Sidebar isDarkTheme={isDarkTheme} /> : null}
         <div className="flex flex-1 flex-col min-h-0">
