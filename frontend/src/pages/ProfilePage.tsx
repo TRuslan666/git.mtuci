@@ -183,21 +183,64 @@ export default function ProfilePage({ isDarkTheme = false }: ProfilePageProps) {
               {/* Шапка профиля — горизонтальный layout */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
               {/* Аватар слева — компактный */}
-              <div style={{ 
-                width: "56px", 
-                height: "56px", 
-                borderRadius: "50%", 
-                background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                fontWeight: "600",
-                color: "#fff",
-                flexShrink: 0
-              }}>
-                {me?.full_name?.charAt(0).toUpperCase()}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  background: me?.avatar_url ? undefined : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "22px",
+                  fontWeight: "600",
+                  color: "#fff",
+                  flexShrink: 0,
+                  cursor: "pointer",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                {me?.avatar_url ? (
+                  <img
+                    src={me.avatar_url}
+                    alt={me?.full_name || ""}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  me?.full_name?.charAt(0).toUpperCase()
+                )}
+                {/* Hover overlay */}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: 0,
+                    transition: "opacity 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
+                >
+                  <span style={{ fontSize: "10px", color: "#fff" }}>Изменить</span>
+                </div>
               </div>
+              {/* Скрытый input для загрузки */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                style={{ display: "none" }}
+              />
 
               {/* Блок информации справа — вертикально */}
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
