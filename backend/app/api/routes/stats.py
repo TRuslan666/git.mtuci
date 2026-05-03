@@ -15,6 +15,7 @@ from app.core.security import get_current_user
 from app.core.permissions import require_permission
 from app.models.repository import Repository, RepositoryType
 from app.models.user import User, UserRole
+from app.models.activity_log import ActivityLog, ActivityType
 from app.services.gitea_service import list_repo_commits, GITEA_ADMIN_USERNAME
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -137,7 +138,120 @@ class ActiveRepositoryStat(BaseModel):
     commits: int
     is_public: bool
     initials: str
+
+
+class HotRepoStat(BaseModel):
+    """Hot repository statistics (most events today)."""
+    name: str
+    events: int
+
+
+class TopUserStat(BaseModel):
+    """Top user statistics (by commits today)."""
+    name: str
+    initials: str
     color: str
+    count: int
+    percent: int  # Percent relative to top user (for bar width)
+
+
+@router.get("/top-users", response_model=list[TopUserStat])
+async def get_top_users(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[TopUserStat]:
+    """
+    Get top 5 users by commits for today.
+    
+    Note: Uses activity_log table for real statistics.
+    """
+    from datetime import datetime, timezone
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get top users by commit count for today
+    result = await session.execute(
+        select(
+            User.id,
+            User.full_name,
+            func.count(ActivityLog.id).label("commit_count")
+        )
+        .join(ActivityLog, User.id == ActivityLog.user_id)
+        .where(
+            ActivityLog.activity_type == ActivityType.commit,
+            ActivityLog.created_at >= today_start
+        )
+        .group_by(User.id, User.full_name)
+        .order_by(func.count(ActivityLog.id).desc())
+        .limit(5)
+    )
+    
+    users = result.all()
+    
+    # If no data, return empty list
+    if not users:
+        return []
+    
+    # Calculate max count for percent calculation
+    max_count = max(user.commit_count for user in users) if users else 1
+    
+    def get_initials(full_name: str) -> str:
+        parts = full_name.strip().split()
+        if len(parts) >= 2:
+            return f"{parts[0][0]}{parts[1][0]}".upper()
+        return full_name[:2].upper() if full_name else "??"
+    
+    # Colors for top users (matching frontend)
+    colors = ["#60a5fa", "#fbbf24", "#a78bfa", "#4caf50", "#e24b4a"]
+    
+    return [
+        TopUserStat(
+            name=user.full_name,
+            initials=get_initials(user.full_name),
+            color=colors[i % len(colors)],
+            count=user.commit_count,
+            percent=int((user.commit_count / max_count) * 100)
+        )
+        for i, user in enumerate(users)
+    ]
+
+
+@router.get("/hot-repos", response_model=list[HotRepoStat])
+async def get_hot_repos(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[HotRepoStat]:
+    """
+    Get top repositories by activity (events) for today.
+    
+    Note: Uses activity_log table for real statistics.
+    """
+    from datetime import datetime, timezone
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get top repos by activity count for today
+    result = await session.execute(
+        select(
+            ActivityLog.repo_name,
+            func.count(ActivityLog.id).label("event_count")
+        )
+        .where(
+            ActivityLog.created_at >= today_start,
+            ActivityLog.repo_name.isnot(None)
+        )
+        .group_by(ActivityLog.repo_name)
+        .order_by(func.count(ActivityLog.id).desc())
+        .limit(5)
+    )
+    
+    repos = result.all()
+    
+    # If no data, return empty list
+    if not repos:
+        return []
+    
+    return [HotRepoStat(name=repo_name, events=count) for repo_name, count in repos]
 
 
 # Color palette for repository cards (matching frontend mock)
@@ -156,6 +270,155 @@ def get_initials(full_name: str) -> str:
     if len(parts) >= 2:
         return f"{parts[0][0]}{parts[1][0]}".upper()
     return full_name[:2].upper() if full_name else "??"
+
+
+class TodayStats(BaseModel):
+    """Statistics for today (and comparison with yesterday)."""
+    total_events: int
+    total_events_delta: int  # +N to yesterday
+    commits: int
+    commits_delta: int
+    active_users: int
+    active_users_delta: int
+    new_repositories: int
+    new_repositories_delta: int
+
+
+class HourlyActivity(BaseModel):
+    """Activity count by hour (24 hours)."""
+    hour: int  # 0-23
+    count: int
+    is_current: bool  # Highlight current hour
+
+
+@router.get("/hourly-activity", response_model=list[HourlyActivity])
+async def get_hourly_activity(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[HourlyActivity]:
+    """
+    Get activity count by hour for today (24 hour bars).
+    
+    Note: Uses activity_log table for real statistics.
+    """
+    from datetime import datetime, timezone
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    current_hour = datetime.now(timezone.utc).hour
+    
+    # Get activity count by hour for today
+    result = await session.execute(
+        select(
+            func.extract('hour', ActivityLog.created_at).label("hour"),
+            func.count(ActivityLog.id).label("event_count")
+        )
+        .where(ActivityLog.created_at >= today_start)
+        .group_by(func.extract('hour', ActivityLog.created_at))
+        .order_by(func.extract('hour', ActivityLog.created_at))
+    )
+    
+    hourly_data = {int(row.hour): row.event_count for row in result.all()}
+    
+    # Fill in missing hours with 0
+    return [
+        HourlyActivity(
+            hour=i,
+            count=hourly_data.get(i, 0),
+            is_current=(i == current_hour)
+        )
+        for i in range(24)
+    ]
+
+
+@router.get("/today", response_model=TodayStats)
+async def get_today_stats(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TodayStats:
+    """
+    Get activity statistics for today with comparison to yesterday.
+    
+    Note: Uses activity_log table for real-time statistics.
+    """
+    from datetime import datetime, timedelta, timezone
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_end = today_start
+    
+    # Today stats
+    today_result = await session.execute(
+        select(func.count(ActivityLog.id)).where(ActivityLog.created_at >= today_start)
+    )
+    total_events = today_result.scalar() or 0
+    
+    # Yesterday stats for delta
+    yesterday_result = await session.execute(
+        select(func.count(ActivityLog.id)).where(
+            ActivityLog.created_at >= yesterday_start,
+            ActivityLog.created_at < yesterday_end
+        )
+    )
+    yesterday_events = yesterday_result.scalar() or 0
+    total_events_delta = total_events - yesterday_events
+    
+    # Commits today
+    commits_result = await session.execute(
+        select(func.count(ActivityLog.id)).where(
+            ActivityLog.activity_type == ActivityType.commit,
+            ActivityLog.created_at >= today_start
+        )
+    )
+    commits = commits_result.scalar() or 0
+    
+    # Commits yesterday
+    commits_yesterday_result = await session.execute(
+        select(func.count(ActivityLog.id)).where(
+            ActivityLog.activity_type == ActivityType.commit,
+            ActivityLog.created_at >= yesterday_start,
+            ActivityLog.created_at < yesterday_end
+        )
+    )
+    commits_yesterday = commits_yesterday_result.scalar() or 0
+    commits_delta = commits - commits_yesterday
+    
+    # Active users today (unique users with activity)
+    users_result = await session.execute(
+        select(func.count(func.distinct(ActivityLog.user_id))).where(
+            ActivityLog.created_at >= today_start
+        )
+    )
+    active_users = users_result.scalar() or 0
+    
+    # Active users yesterday
+    users_yesterday_result = await session.execute(
+        select(func.count(func.distinct(ActivityLog.user_id))).where(
+            ActivityLog.created_at >= yesterday_start,
+            ActivityLog.created_at < yesterday_end
+        )
+    )
+    active_users_yesterday = users_yesterday_result.scalar() or 0
+    active_users_delta = active_users - active_users_yesterday
+    
+    # New repositories today
+    new_repos_result = await session.execute(
+        select(func.count(ActivityLog.id)).where(
+            ActivityLog.activity_type == ActivityType.repo_created,
+            ActivityLog.created_at >= today_start
+        )
+    )
+    new_repositories = new_repos_result.scalar() or 0
+    
+    return TodayStats(
+        total_events=total_events,
+        total_events_delta=total_events_delta,
+        commits=commits,
+        commits_delta=commits_delta,
+        active_users=active_users,
+        active_users_delta=active_users_delta,
+        new_repositories=new_repositories,
+        new_repositories_delta=0,  # Not tracking delta for repos
+    )
 
 
 @router.get("/total-users")

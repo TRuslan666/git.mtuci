@@ -15,6 +15,7 @@ from app.api.routes.repositories import router as repositories_router
 from app.api.routes.groups import router as groups_router
 from app.api.routes.stats import router as stats_router
 from app.api.routes.roles import router as roles_router
+from app.api.routes.webhooks import router as webhooks_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
@@ -44,6 +45,7 @@ app.include_router(groups_router)
 app.include_router(repositories_router, prefix="/repositories")
 app.include_router(stats_router)
 app.include_router(roles_router)
+app.include_router(webhooks_router)
 
 # Development CORS:
 # Frontend runs on http://localhost:3001 and API on http://localhost:8000.

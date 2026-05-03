@@ -1,3 +1,4 @@
+from app.models.activity_log import ActivityLog, ActivityType
 from app.models.assignment import Assignment
 from app.models.assignment_file import AssignmentFile
 from app.models.base import Base
@@ -18,4 +19,6 @@ __all__ = [
     "Submission",
     "Repository",
     "StudentRepository",
+    "ActivityLog",
+    "ActivityType",
 ]

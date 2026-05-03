@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo } from "./types";
+import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo, TodayStats, HotRepoStat, TopUserStat, HourlyActivity } from "./types";
 
 export async function getAdminUsers(): Promise<AdminUserRead[]> {
   return apiRequest<AdminUserRead[]>("/admin/users");
@@ -115,3 +115,18 @@ export async function getGroups(): Promise<string[]> {
   return apiRequest<string[]>("/groups");
 }
 
+export async function getTodayStats(): Promise<TodayStats> {
+  return apiRequest<TodayStats>("/stats/today");
+}
+
+export async function getHotRepos(): Promise<HotRepoStat[]> {
+  return apiRequest<HotRepoStat[]>("/stats/hot-repos");
+}
+
+export async function getTopUsers(): Promise<TopUserStat[]> {
+  return apiRequest<TopUserStat[]>("/stats/top-users");
+}
+
+export async function getHourlyActivity(): Promise<HourlyActivity[]> {
+  return apiRequest<HourlyActivity[]>("/stats/hourly-activity");
+}

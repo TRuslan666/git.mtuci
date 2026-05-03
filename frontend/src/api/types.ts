@@ -71,6 +71,36 @@ export interface ActiveRepositoryStat {
   color: string;
 }
 
+export interface TodayStats {
+  total_events: number;
+  total_events_delta: number;
+  commits: number;
+  commits_delta: number;
+  active_users: number;
+  active_users_delta: number;
+  new_repositories: number;
+  new_repositories_delta: number;
+}
+
+export interface HotRepoStat {
+  name: string;
+  events: number;
+}
+
+export interface TopUserStat {
+  name: string;
+  initials: string;
+  color: string;
+  count: number;
+  percent: number;
+}
+
+export interface HourlyActivity {
+  hour: number;
+  count: number;
+  is_current: boolean;
+}
+
 export interface Course {
   id: string;
   title: string;
