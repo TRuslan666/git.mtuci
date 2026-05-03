@@ -353,7 +353,7 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
         {/* Right Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {/* Hour Activity */}
-          <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px", overflow: "hidden" }}>
+          <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px" }}>
             <div style={{
               padding: "10px 14px", borderBottom: `0.5px solid ${colors.border}`, fontSize: "11px",
               fontWeight: 600, color: colors.textPrimary, display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -361,24 +361,111 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
             }}>
               Активность по часам <span style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: 400 }}>Сегодня</span>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", padding: "12px 14px", height: "80px" }}>
-              {hourlyActivity.length > 0 ? (
-                hourlyActivity.map((item) => {
-                  const maxCount = Math.max(...hourlyActivity.map(h => h.count), 1);
-                  const heightPercent = (item.count / maxCount) * 100;
-                  return (
-                    <div key={item.hour} style={{
-                      flex: 1,
-                      background: item.is_current ? colors.accent : `${colors.accent}30`,
-                      borderRadius: "3px 3px 0 0",
-                      height: `${heightPercent}%`,
-                      minHeight: "4px"
-                    }} title={`${item.hour}:00 - ${item.count} событий`} />
-                  );
-                })
-              ) : (
-                <div style={{ flex: 1, textAlign: "center", color: colors.textSecondary, fontSize: "11px" }}>Загрузка...</div>
-              )}
+            <div style={{ padding: "12px 14px 6px", height: "120px", position: "relative" }}>
+              {/* Tooltip */}
+              {(() => {
+                const [tooltip, setTooltip] = useState<{x: number, y: number, hour: number, count: number} | null>(null);
+                const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+                const maxCount = Math.max(...hourlyActivity.map(h => h.count), 1);
+                const peakHour = hourlyActivity.find(h => h.count === maxCount)?.hour;
+                
+                return (
+                  <>
+                    {/* Bars */}
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "90px" }}>
+                      {hourlyActivity.map((item) => {
+                        // Scale to 80px max (leaving 10px padding), min 4px for visibility
+                        const barHeight = item.count > 0 
+                          ? Math.max((item.count / maxCount) * 80, 4) 
+                          : 4;
+                        const isPeak = item.hour === peakHour && item.count > 0;
+                        const isCurrent = item.is_current;
+                        const isHovered = hoveredHour === item.hour;
+                        
+                        return (
+                          <div key={item.hour} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <div
+                              style={{
+                                width: "100%",
+                                background: isHovered
+                                  ? "#fff"
+                                  : isCurrent 
+                                    ? colors.accent 
+                                    : isPeak 
+                                      ? `${colors.accent}80` 
+                                      : `${colors.accent}30`,
+                                borderRadius: "3px 3px 0 0",
+                                height: `${barHeight}px`,
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                boxShadow: isHovered 
+                                  ? `0 0 12px #fff80` 
+                                  : isPeak 
+                                    ? `0 0 8px ${colors.accent}50` 
+                                    : "none",
+                              }}
+                              onMouseEnter={(e) => {
+                                setHoveredHour(item.hour);
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const parent = e.currentTarget.parentElement?.parentElement?.parentElement;
+                                if (parent) {
+                                  const parentRect = parent.getBoundingClientRect();
+                                  setTooltip({
+                                    x: rect.left - parentRect.left + rect.width / 2,
+                                    y: rect.top - parentRect.top - 35,
+                                    hour: item.hour,
+                                    count: item.count
+                                  });
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredHour(null);
+                                setTooltip(null);
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Time Labels */}
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      marginTop: "6px",
+                      padding: "0 2px"
+                    }}>
+                      {["00:00", "06:00", "12:00", "18:00", "23:59"].map((time) => (
+                        <span key={time} style={{ fontSize: "9px", color: colors.textSecondary }}>
+                          {time}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    {/* Tooltip */}
+                    {tooltip && (
+                      <div style={{
+                        position: "absolute",
+                        left: tooltip.x,
+                        top: tooltip.y,
+                        transform: "translateX(-50%)",
+                        background: "rgba(0, 0, 0, 0.85)",
+                        color: "#fff",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        whiteSpace: "nowrap",
+                        pointerEvents: "none",
+                        zIndex: 1000,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+                      }}>
+                        <div style={{ fontWeight: 600 }}>{String(tooltip.hour).padStart(2, "0")}:00</div>
+                        <div style={{ opacity: 0.8 }}>{tooltip.count} событий</div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
