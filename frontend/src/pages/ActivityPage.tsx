@@ -52,7 +52,7 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
   const [wsConnected, setWsConnected] = useState(false);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [totalActivities, setTotalActivities] = useState(0);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(10);
   const [pageOffset, setPageOffset] = useState(0);
   const [realtimeEvents, setRealtimeEvents] = useState<Array<{id: number, type: string, message: string, time: Date}>>([]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -328,23 +328,52 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "10px 14px", borderTop: `0.5px solid ${colors.border}`, fontSize: "11px", color: colors.textSecondary
             }}>
+              {/* Left: Count */}
               <span>Показано {activities.length} из {totalActivities}</span>
-              <div style={{ display: "flex", gap: "4px" }}>
-                {[10, 25, 50].map((size) => (
+              
+              {/* Center: Page buttons */}
+              <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                {Math.floor(pageOffset / pageSize) > 0 && (
                   <button
-                    key={size}
-                    onClick={() => { setPageSize(size); setPageOffset(0); }}
+                    onClick={() => setPageOffset(Math.max(0, pageOffset - pageSize))}
                     style={{
-                      width: "32px", height: "26px", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      borderRadius: "6px", border: `0.5px solid ${colors.border}`, fontSize: "11px", cursor: "pointer",
-                      color: pageSize === size ? "#fff" : colors.textSecondary,
-                      background: pageSize === size ? colors.accent : "transparent",
-                      borderColor: pageSize === size ? "transparent" : colors.border
+                      padding: "3px 8px", borderRadius: "6px", border: `0.5px solid ${colors.border}`,
+                      fontSize: "11px", cursor: "pointer", color: colors.textSecondary, background: "transparent"
                     }}
-                  >
-                    {size}
-                  </button>
-                ))}
+                  >←</button>
+                )}
+                <span style={{
+                  padding: "3px 10px", borderRadius: "6px", fontSize: "11px",
+                  color: "#fff", background: colors.accent, fontWeight: 500
+                }}>
+                  {Math.floor(pageOffset / pageSize) + 1}
+                </span>
+                {Math.floor(pageOffset / pageSize) + 1 < Math.ceil(totalActivities / pageSize) && (
+                  <button
+                    onClick={() => setPageOffset(pageOffset + pageSize < totalActivities ? pageOffset + pageSize : pageOffset)}
+                    style={{
+                      padding: "3px 8px", borderRadius: "6px", border: `0.5px solid ${colors.border}`,
+                      fontSize: "11px", cursor: "pointer", color: colors.textSecondary, background: "transparent"
+                    }}
+                  >→</button>
+                )}
+              </div>
+              
+              {/* Right: Page size selector */}
+              <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                <span>По</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPageOffset(0); }}
+                  style={{
+                    padding: "3px 6px", borderRadius: "6px", border: `0.5px solid ${colors.border}`,
+                    fontSize: "11px", color: colors.textSecondary, background: "transparent", cursor: "pointer"
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
             </div>
           </div>
