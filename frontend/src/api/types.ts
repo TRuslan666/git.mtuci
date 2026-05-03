@@ -101,6 +101,19 @@ export interface HourlyActivity {
   is_current: boolean;
 }
 
+export interface ActivityItem {
+  id: string;
+  type: string;
+  user: string;
+  initials: string;
+  color: string;
+  repo: string;
+  message: string;
+  time: string;
+  tag: string;
+  timestamp: string;
+}
+
 export interface Course {
   id: string;
   title: string;

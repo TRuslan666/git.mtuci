@@ -16,6 +16,8 @@ from app.api.routes.groups import router as groups_router
 from app.api.routes.stats import router as stats_router
 from app.api.routes.roles import router as roles_router
 from app.api.routes.webhooks import router as webhooks_router
+from app.api.routes.websocket import router as websocket_router
+from app.api.routes.activity import router as activity_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
@@ -46,12 +48,19 @@ app.include_router(repositories_router, prefix="/repositories")
 app.include_router(stats_router)
 app.include_router(roles_router)
 app.include_router(webhooks_router)
+app.include_router(websocket_router)
+app.include_router(activity_router)
 
 # Development CORS:
 # Frontend runs on http://localhost:3001 and API on http://localhost:8000.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=[
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

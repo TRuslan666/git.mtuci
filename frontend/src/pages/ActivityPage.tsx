@@ -1,8 +1,8 @@
-import { Search, Download, GitCommit, GitPullRequest, GitBranch, Plus, Trash2, GitMerge, ArrowUpCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Search, Download, GitCommit, GitPullRequest, GitBranch, Plus, Trash2, GitMerge, ArrowUpCircle, Wifi } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import AdminPageHeader from "../components/AdminPageHeader";
-import { getTodayStats, getHotRepos, getTopUsers, getHourlyActivity } from "../api/adminApi";
-import type { TodayStats, HotRepoStat, TopUserStat, HourlyActivity } from "../api/types";
+import { getTodayStats, getHotRepos, getTopUsers, getHourlyActivity, getRecentActivity } from "../api/adminApi";
+import type { TodayStats, HotRepoStat, TopUserStat, HourlyActivity, ActivityItem } from "../api/types";
 
 interface ActivityPageProps {
   isDarkTheme?: boolean;
@@ -31,23 +31,16 @@ const getColors = (isDark: boolean) => ({
 const EventIcons = {
   commit: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="8" cy="8" r="3"/><path d="M1 8h4M11 8h4" strokeLinecap="round"/></svg>,
   pr: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M4 6v2a4 4 0 004 4h2M14 8l-2-2 2-2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  pull_request: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M4 6v2a4 4 0 004 4h2M14 8l-2-2 2-2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   push: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M8 12V4M4 8l4-4 4 4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   create: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="2" y="1" width="12" height="14" rx="2"/><path d="M8 5v6M5 8h6" strokeLinecap="round"/></svg>,
+  repo_created: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="2" y="1" width="12" height="14" rx="2"/><path d="M8 5v6M5 8h6" strokeLinecap="round"/></svg>,
   fork: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="8" cy="13" r="2"/><path d="M4 6v1a4 4 0 008 0V6M8 11V9" strokeLinecap="round"/></svg>,
   merge: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="4" cy="4" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="12" cy="8" r="2"/><path d="M4 6v5M4 6c0 3 8 2 8 2" strokeLinecap="round"/></svg>,
+  pr_merge: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><circle cx="4" cy="4" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="12" cy="8" r="2"/><path d="M4 6v5M4 6c0 3 8 2 8 2" strokeLinecap="round"/></svg>,
   delete: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5M4 4l1 9h6l1-9" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  repo_deleted: <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5M4 4l1 9h6l1-9" strokeLinecap="round" strokeLinejoin="round"/></svg>,
 };
-
-// Демо-данные активности (без colors, цвета будут в компоненте)
-const demoActivitiesData = [
-  { id: 1, type: "commit", user: "Петров И.А.", initials: "ПИ", color: "#60a5fa", repo: "ist21/lab-db-petrov", message: "fix: исправлен JOIN запрос в лабе", time: "19:42", tag: "Коммит" },
-  { id: 2, type: "pr", user: "Орлова В.С.", initials: "ОВ", color: "#4caf50", repo: "is22/networks-lab3", message: "Добавить обработку ICMP пакетов", time: "19:15", tag: "Pull Request" },
-  { id: 3, type: "push", user: "Кузнецов Д.В.", initials: "КД", color: "#fbbf24", repo: "kuz/os-course-2026", message: "3 коммита", time: "18:57", tag: "Push" },
-  { id: 4, type: "create", user: "Сидоров А.Н.", initials: "СА", color: "#a78bfa", repo: "sidorov/crypto-hw3", message: "новый репозиторий", time: "18:30", tag: "Создание" },
-  { id: 5, type: "fork", user: "Мишина Е.Р.", initials: "МЕ", color: "#e24b4a", repo: "kuz/os-course-2026", message: "→ mishina/os-course-2026", time: "17:44", tag: "Форк" },
-  { id: 6, type: "merge", user: "Кузнецов Д.В.", initials: "КД", color: "#fbbf24", repo: "kuz/os-course-2026", message: "Pull Request #7", time: "17:10", tag: "Merge" },
-  { id: 7, type: "delete", user: "Super Admin", initials: "SA", color: "#60a5fa", repo: "test/old-repo", message: "удалён", time: "15:58", tag: "Удаление" },
-];
 
 export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) {
   const colors = getColors(isDarkTheme);
@@ -56,38 +49,102 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
   const [topUsers, setTopUsers] = useState<TopUserStat[]>([]);
   const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [totalActivities, setTotalActivities] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [realtimeEvents, setRealtimeEvents] = useState<Array<{id: number, type: string, message: string, time: Date}>>([]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const eventIdRef = useRef(0);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [statsData, reposData, usersData, hourlyData] = await Promise.all([
-          getTodayStats(),
-          getHotRepos(),
-          getTopUsers(),
-          getHourlyActivity(),
-        ]);
-        setStats(statsData);
-        setHotRepos(reposData);
-        setTopUsers(usersData);
-        setHourlyActivity(hourlyData);
-      } catch (error) {
-        console.error("Failed to load activity data:", error);
-      } finally {
-        setLoading(false);
-      }
+  // Load data function
+  const loadData = useCallback(async () => {
+    try {
+      const [statsData, reposData, usersData, hourlyData, activityData] = await Promise.all([
+        getTodayStats(),
+        getHotRepos(),
+        getTopUsers(),
+        getHourlyActivity(),
+        getRecentActivity(pageSize, pageOffset),
+      ]);
+      setStats(statsData);
+      setHotRepos(reposData);
+      setTopUsers(usersData);
+      setHourlyActivity(hourlyData);
+      setActivities(activityData.activities);
+      setTotalActivities(activityData.total);
+    } catch (error) {
+      console.error("Failed to load activity data:", error);
+    } finally {
+      setLoading(false);
     }
+  }, [pageSize, pageOffset])
+
+  // WebSocket connection
+  useEffect(() => {
+    const wsUrl = `ws://localhost:8000/ws/activity`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+      setWsConnected(true);
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("WebSocket message:", data);
+      
+      if (data.type === "new_activity") {
+        // Add to realtime events
+        setRealtimeEvents(prev => [{
+          id: ++eventIdRef.current,
+          type: data.activity_type,
+          message: `${data.user_name} ${data.activity_type} to ${data.repo_name}: ${data.message}`,
+          time: new Date()
+        }, ...prev].slice(0, 5)); // Keep last 5
+        
+        // Refresh stats after short delay
+        setTimeout(() => loadData(), 500);
+      } else if (data.type === "stats_updated") {
+        setTimeout(() => loadData(), 500);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected");
+      setWsConnected(false);
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setWsConnected(false);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [loadData]);
+
+  // Initial data load
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const getEventIconBg = (type: string) => {
     switch (type) {
       case "commit": return { bg: `${colors.accent}20`, color: colors.accent2 };
-      case "pr": return { bg: `${colors.teal}20`, color: colors.teal };
+      case "pr":
+      case "pull_request": return { bg: `${colors.teal}20`, color: colors.teal };
       case "push": return { bg: `${colors.success}20`, color: colors.success };
-      case "create": return { bg: `${colors.purple}20`, color: colors.purple };
+      case "create":
+      case "repo_created": return { bg: `${colors.purple}20`, color: colors.purple };
       case "fork": return { bg: `${colors.warning}20`, color: colors.warning };
-      case "merge": return { bg: `${colors.violet}20`, color: colors.violet };
-      case "delete": return { bg: `${colors.danger}20`, color: colors.danger };
+      case "merge":
+      case "pr_merge": return { bg: `${colors.violet}20`, color: colors.violet };
+      case "delete":
+      case "repo_deleted": return { bg: `${colors.danger}20`, color: colors.danger };
       default: return { bg: `${colors.accent}20`, color: colors.accent2 };
     }
   };
@@ -174,6 +231,16 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               }} />
             </div>
             <div style={{ width: "0.5px", height: "20px", background: colors.border }} />
+            {/* WebSocket Status */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px",
+              background: wsConnected ? `${colors.success}20` : `${colors.danger}20`,
+              borderRadius: "6px", fontSize: "11px", color: wsConnected ? colors.success : colors.danger
+            }}>
+              <Wifi size={12} />
+              {wsConnected ? "Online" : "Offline"}
+            </div>
+            <div style={{ width: "0.5px", height: "20px", background: colors.border }} />
             <select style={{
               fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
               background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
@@ -209,7 +276,7 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               Сегодня — {new Date().toLocaleDateString("ru-RU")}
             </div>
 
-            {demoActivitiesData.map((activity) => {
+            {activities.map((activity: ActivityItem) => {
               const iconBg = getEventIconBg(activity.type);
               const tagStyle = getTagStyle(activity.tag);
               return (
@@ -261,26 +328,24 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "10px 14px", borderTop: `0.5px solid ${colors.border}`, fontSize: "11px", color: colors.textSecondary
             }}>
-              <span>Показано 7 из 284</span>
+              <span>Показано {activities.length} из {totalActivities}</span>
               <div style={{ display: "flex", gap: "4px" }}>
-                {["‹", "1", "2", "3", "...", "29", "›"].map((btn, i) => (
-                  <button key={i} style={{
-                    width: "26px", height: "26px", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    borderRadius: "6px", border: `0.5px solid ${colors.border}`, fontSize: "11px", cursor: "pointer",
-                    color: btn === "1" ? "#fff" : colors.textSecondary,
-                    background: btn === "1" ? colors.accent : "transparent",
-                    borderColor: btn === "1" ? "transparent" : colors.border
-                  }}>{btn}</button>
+                {[10, 25, 50].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => { setPageSize(size); setPageOffset(0); }}
+                    style={{
+                      width: "32px", height: "26px", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      borderRadius: "6px", border: `0.5px solid ${colors.border}`, fontSize: "11px", cursor: "pointer",
+                      color: pageSize === size ? "#fff" : colors.textSecondary,
+                      background: pageSize === size ? colors.accent : "transparent",
+                      borderColor: pageSize === size ? "transparent" : colors.border
+                    }}
+                  >
+                    {size}
+                  </button>
                 ))}
               </div>
-              <select style={{
-                fontSize: "11px", padding: "3px 6px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
-                background: colors.pageBg, color: colors.textPrimary, fontFamily: "inherit"
-              }}>
-                <option>10</option>
-                <option>25</option>
-                <option>50</option>
-              </select>
             </div>
           </div>
         </div>

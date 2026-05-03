@@ -130,3 +130,26 @@ export async function getTopUsers(): Promise<TopUserStat[]> {
 export async function getHourlyActivity(): Promise<HourlyActivity[]> {
   return apiRequest<HourlyActivity[]>("/stats/hourly-activity");
 }
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  user: string;
+  initials: string;
+  color: string;
+  repo: string;
+  message: string;
+  time: string;
+  tag: string;
+  timestamp: string;
+}
+
+export interface RecentActivityResponse {
+  activities: ActivityItem[];
+  count: number;
+  total: number;
+}
+
+export async function getRecentActivity(limit: number = 50, offset: number = 0): Promise<RecentActivityResponse> {
+  return apiRequest<RecentActivityResponse>(`/activity/recent?limit=${limit}&offset=${offset}`);
+}
