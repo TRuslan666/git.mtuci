@@ -150,6 +150,28 @@ export interface RecentActivityResponse {
   total: number;
 }
 
-export async function getRecentActivity(limit: number = 50, offset: number = 0): Promise<RecentActivityResponse> {
-  return apiRequest<RecentActivityResponse>(`/activity/recent?limit=${limit}&offset=${offset}`);
+export interface ActivityFilters {
+  search?: string;
+  activityType?: string;
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export async function getRecentActivity(
+  limit: number = 50,
+  offset: number = 0,
+  filters?: ActivityFilters
+): Promise<RecentActivityResponse> {
+  const params = new URLSearchParams();
+  params.append("limit", String(limit));
+  params.append("offset", String(offset));
+  
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.activityType) params.append("activity_type", filters.activityType);
+  if (filters?.userId) params.append("user_id", filters.userId);
+  if (filters?.dateFrom && filters.dateFrom !== "undefined") params.append("date_from", filters.dateFrom);
+  if (filters?.dateTo && filters.dateTo !== "undefined") params.append("date_to", filters.dateTo);
+  
+  return apiRequest<RecentActivityResponse>(`/activity/recent?${params.toString()}`);
 }

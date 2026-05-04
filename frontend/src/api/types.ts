@@ -88,6 +88,8 @@ export interface HotRepoStat {
 }
 
 export interface TopUserStat {
+  user_id: string;
+  user_name: string;
   name: string;
   initials: string;
   color: string;

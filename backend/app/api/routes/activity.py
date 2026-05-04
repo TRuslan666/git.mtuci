@@ -19,20 +19,64 @@ async def get_recent_activity(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     activity_type: Optional[str] = None,
+    search: Optional[str] = None,
+    user_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Get recent activity log entries with pagination.
-    Optional filter by activity type.
+    Get recent activity log entries with pagination and filters.
     """
     # Build base query for counting
     count_query = select(func.count(ActivityLog.id))
     
+    # Build data query
+    query = (
+        select(ActivityLog, User.full_name, User.email)
+        .join(User, ActivityLog.user_id == User.id, isouter=True)
+    )
+    
+    # Apply filters
     if activity_type:
         try:
             act_type = ActivityType(activity_type)
             count_query = count_query.where(ActivityLog.activity_type == act_type)
+            query = query.where(ActivityLog.activity_type == act_type)
+        except ValueError:
+            pass
+    
+    if user_id:
+        count_query = count_query.where(ActivityLog.user_id == user_id)
+        query = query.where(ActivityLog.user_id == user_id)
+    
+    if search:
+        search_pattern = f"%{search}%"
+        count_query = count_query.where(
+            (ActivityLog.repo_name.ilike(search_pattern)) |
+            (ActivityLog.message.ilike(search_pattern)) |
+            (ActivityLog.user_login.ilike(search_pattern))
+        )
+        query = query.where(
+            (ActivityLog.repo_name.ilike(search_pattern)) |
+            (ActivityLog.message.ilike(search_pattern)) |
+            (ActivityLog.user_login.ilike(search_pattern))
+        )
+    
+    if date_from:
+        try:
+            from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            count_query = count_query.where(ActivityLog.created_at >= from_dt)
+            query = query.where(ActivityLog.created_at >= from_dt)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            count_query = count_query.where(ActivityLog.created_at <= to_dt)
+            query = query.where(ActivityLog.created_at <= to_dt)
         except ValueError:
             pass
     
@@ -40,21 +84,8 @@ async def get_recent_activity(
     total_result = await session.execute(count_query)
     total_count = total_result.scalar() or 0
     
-    # Build data query
-    query = (
-        select(ActivityLog, User.full_name, User.email)
-        .join(User, ActivityLog.user_id == User.id, isouter=True)
-        .order_by(desc(ActivityLog.created_at))
-        .offset(offset)
-        .limit(limit)
-    )
-    
-    if activity_type:
-        try:
-            act_type = ActivityType(activity_type)
-            query = query.where(ActivityLog.activity_type == act_type)
-        except ValueError:
-            pass  # Invalid type, ignore filter
+    # Complete query
+    query = query.order_by(desc(ActivityLog.created_at)).offset(offset).limit(limit)
     
     result = await session.execute(query)
     rows = result.all()

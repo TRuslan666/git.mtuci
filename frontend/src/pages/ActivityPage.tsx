@@ -57,16 +57,95 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
   const [realtimeEvents, setRealtimeEvents] = useState<Array<{id: number, type: string, message: string, time: Date}>>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const eventIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+
+  // Helper to render trend indicator
+  const renderTrend = (delta: number | undefined) => {
+    if (delta === undefined || delta === 0) {
+      return <span style={{ fontSize: "10px", color: colors.textSecondary }}>— <span style={{ fontSize: "9px", color: colors.textMuted }}>к вчера</span></span>;
+    }
+    const isPositive = delta > 0;
+    const absValue = Math.abs(delta);
+    const color = isPositive ? colors.success : colors.danger;
+    const arrow = isPositive ? "↑" : "↓";
+    const sign = isPositive ? "+" : "−";
+    
+    return (
+      <span style={{ fontSize: "10px", color, fontWeight: 500 }}>
+        {arrow} {sign}{absValue}{" "}
+        <span style={{ fontSize: "9px", color: colors.textMuted, fontWeight: 400 }}>к вчера</span>
+      </span>
+    );
+  };
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<"today" | "week" | "month" | "all">("today");
+
+  // Available users and event types for filters
+  const eventTypes = [
+    { value: "", label: "Все типы" },
+    { value: "push", label: "Push" },
+    { value: "commit", label: "Commit" },
+    { value: "pull_request", label: "Pull Request" },
+    { value: "pr_merge", label: "PR Merge" },
+    { value: "repo_created", label: "Создание репозитория" },
+    { value: "repo_deleted", label: "Удаление репозитория" },
+    { value: "fork", label: "Fork" },
+    { value: "login", label: "Вход в систему" },
+  ];
+
+  // Calculate date range (moved outside loadData to avoid recreating)
+  const getDateRange = useCallback(() => {
+    const now = new Date();
+    let dateFrom: string | undefined;
+    let dateTo: string | undefined;
+    
+    switch (dateRange) {
+      case "today":
+        dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        dateTo = now.toISOString();
+        break;
+      case "week":
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        dateFrom = weekAgo.toISOString();
+        dateTo = now.toISOString();
+        break;
+      case "month":
+        const monthAgo = new Date(now);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        dateFrom = monthAgo.toISOString();
+        dateTo = now.toISOString();
+        break;
+      case "all":
+        dateFrom = undefined;
+        dateTo = undefined;
+        break;
+    }
+    return { dateFrom, dateTo };
+  }, [dateRange]);
 
   // Load data function
   const loadData = useCallback(async () => {
     try {
+      const { dateFrom, dateTo } = getDateRange();
+      const filters = {
+        search: searchQuery || undefined,
+        activityType: eventTypeFilter || undefined,
+        userId: userFilter || undefined,
+        dateFrom,
+        dateTo,
+      };
+      
       const [statsData, reposData, usersData, hourlyData, activityData] = await Promise.all([
         getTodayStats(),
         getHotRepos(),
         getTopUsers(),
         getHourlyActivity(),
-        getRecentActivity(pageSize, pageOffset),
+        getRecentActivity(pageSize, pageOffset, filters),
       ]);
       setStats(statsData);
       setHotRepos(reposData);
@@ -79,7 +158,7 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageOffset])
+  }, [pageSize, pageOffset, searchQuery, eventTypeFilter, userFilter, dateRange, getDateRange])
 
   // WebSocket connection
   useEffect(() => {
@@ -127,10 +206,29 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
     };
   }, [loadData]);
 
-  // Initial data load
+  // Track if filters have changed (not on initial mount)
+  const filtersChangedRef = useRef(false);
+  
+  // Reset offset when filters change and reload data
+  const handleFilterChange = useCallback((setter: (value: any) => void, value: any) => {
+    setter(value);
+    setPageOffset(0);
+    filtersChangedRef.current = true;
+  }, []);
+
+  // Initial load only - empty deps
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load data when filters or pagination change (skip initial mount)
+  useEffect(() => {
+    if (filtersChangedRef.current) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize, pageOffset, searchQuery, eventTypeFilter, userFilter, dateRange]);
 
   const getEventIconBg = (type: string) => {
     switch (type) {
@@ -188,22 +286,22 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
             <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "14px 16px" }}>
               <div style={{ fontSize: "11px", color: colors.textSecondary, marginBottom: "4px" }}>Событий сегодня</div>
               <div style={{ fontSize: "22px", fontWeight: 600, color: colors.textPrimary }}>{stats.total_events}</div>
-              <div style={{ fontSize: "11px", marginTop: "3px", color: colors.success }}>↑ +{stats.total_events_delta} к вчера</div>
+              <div style={{ marginTop: "3px" }}>{renderTrend(stats.total_events_delta)}</div>
             </div>
             <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "14px 16px" }}>
               <div style={{ fontSize: "11px", color: colors.textSecondary, marginBottom: "4px" }}>Коммитов</div>
               <div style={{ fontSize: "22px", fontWeight: 600, color: colors.textPrimary }}>{stats.commits}</div>
-              <div style={{ fontSize: "11px", marginTop: "3px", color: colors.success }}>↑ +{stats.commits_delta}</div>
+              <div style={{ marginTop: "3px" }}>{renderTrend(stats.commits_delta)}</div>
             </div>
             <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "14px 16px" }}>
               <div style={{ fontSize: "11px", color: colors.textSecondary, marginBottom: "4px" }}>Активных пользователей</div>
               <div style={{ fontSize: "22px", fontWeight: 600, color: colors.textPrimary }}>{stats.active_users}</div>
-              <div style={{ fontSize: "11px", marginTop: "3px", color: colors.success }}>↑ +{stats.active_users_delta}</div>
+              <div style={{ marginTop: "3px" }}>{renderTrend(stats.active_users_delta)}</div>
             </div>
             <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "14px 16px" }}>
               <div style={{ fontSize: "11px", color: colors.textSecondary, marginBottom: "4px" }}>Новых репозиториев</div>
               <div style={{ fontSize: "22px", fontWeight: 600, color: colors.textPrimary }}>{stats.new_repositories}</div>
-              <div style={{ fontSize: "11px", marginTop: "3px", color: colors.textSecondary }}>За сегодня</div>
+              <div style={{ marginTop: "3px" }}>{renderTrend(stats.new_repositories_delta)}</div>
             </div>
           </>
         ) : (
@@ -225,10 +323,16 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               border: `0.5px solid ${colors.border}`, borderRadius: "7px", padding: "5px 10px"
             }}>
               <Search size={13} color={colors.textMuted} />
-              <input type="text" placeholder="Поиск по событиям, пользователям, репо..." style={{
-                background: "transparent", border: "none", outline: "none", fontSize: "12px",
-                color: colors.textPrimary, width: "100%", fontFamily: "inherit"
-              }} />
+              <input
+                type="text"
+                placeholder="Поиск по событиям, пользователям, репо..."
+                value={searchQuery}
+                onChange={(e) => handleFilterChange(setSearchQuery, e.target.value)}
+                style={{
+                  background: "transparent", border: "none", outline: "none", fontSize: "12px",
+                  color: colors.textPrimary, width: "100%", fontFamily: "inherit"
+                }}
+              />
             </div>
             <div style={{ width: "0.5px", height: "20px", background: colors.border }} />
             {/* WebSocket Status */}
@@ -241,29 +345,43 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               {wsConnected ? "Online" : "Offline"}
             </div>
             <div style={{ width: "0.5px", height: "20px", background: colors.border }} />
-            <select style={{
-              fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
-              background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
-            }}>
-              <option>Все события</option>
-              <option>Коммиты</option>
-              <option>Пуши</option>
-              <option>Форки</option>
-              <option>Pull Request</option>
+            <select
+              value={eventTypeFilter}
+              onChange={(e) => handleFilterChange(setEventTypeFilter, e.target.value)}
+              style={{
+                fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
+                background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
+              }}
+            >
+              {eventTypes.map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
             </select>
-            <select style={{
-              fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
-              background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
-            }}>
-              <option>Все пользователи</option>
+            <select
+              value={userFilter || ""}
+              onChange={(e) => handleFilterChange(setUserFilter, e.target.value || null)}
+              style={{
+                fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
+                background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
+              }}
+            >
+              <option value="">Все пользователи</option>
+              {topUsers.map(user => (
+                <option key={user.user_id} value={user.user_id}>{user.user_name}</option>
+              ))}
             </select>
-            <select style={{
-              fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
-              background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
-            }}>
-              <option>Сегодня</option>
-              <option>Вчера</option>
-              <option>За неделю</option>
+            <select
+              value={dateRange}
+              onChange={(e) => handleFilterChange(setDateRange, e.target.value)}
+              style={{
+                fontSize: "11px", padding: "5px 8px", borderRadius: "7px", border: `0.5px solid ${colors.border}`,
+                background: colors.pageBg, color: colors.textPrimary, cursor: "pointer", fontFamily: "inherit"
+              }}
+            >
+              <option value="today">Сегодня</option>
+              <option value="week">За неделю</option>
+              <option value="month">За месяц</option>
+              <option value="all">Все время</option>
             </select>
           </div>
 
@@ -401,11 +519,13 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
                 return (
                   <>
                     {/* Bars */}
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "90px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "90px", overflow: "hidden" }}>
                       {hourlyActivity.map((item) => {
-                        // Scale to 80px max (leaving 10px padding), min 4px for visibility
+                        // Peak takes ~85% of container height (80px), min 4px for visibility
+                        const containerHeight = 90;
+                        const maxBarHeight = containerHeight * 0.85; // ~76px for peak
                         const barHeight = item.count > 0 
-                          ? Math.max((item.count / maxCount) * 80, 4) 
+                          ? Math.max((item.count / maxCount) * maxBarHeight, 4) 
                           : 4;
                         const isPeak = item.hour === peakHour && item.count > 0;
                         const isCurrent = item.is_current;

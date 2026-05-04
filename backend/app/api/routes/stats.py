@@ -148,6 +148,8 @@ class HotRepoStat(BaseModel):
 
 class TopUserStat(BaseModel):
     """Top user statistics (by commits today)."""
+    user_id: str
+    user_name: str
     name: str
     initials: str
     color: str
@@ -206,6 +208,8 @@ async def get_top_users(
     
     return [
         TopUserStat(
+            user_id=str(user.id),
+            user_name=user.full_name,
             name=user.full_name,
             initials=get_initials(user.full_name),
             color=colors[i % len(colors)],
