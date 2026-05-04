@@ -141,9 +141,11 @@ class ActiveRepositoryStat(BaseModel):
 
 
 class HotRepoStat(BaseModel):
-    """Hot repository statistics (most events today)."""
+    """Hot repository statistics (last 24 hours)."""
     name: str
+    url: str
     events: int
+    language: str | None = None
 
 
 class TopUserStat(BaseModel):
@@ -226,36 +228,48 @@ async def get_hot_repos(
     session: AsyncSession = Depends(get_session),
 ) -> list[HotRepoStat]:
     """
-    Get top repositories by activity (events) for today.
+    Get top repositories by activity (events) for last 24 hours.
     
-    Note: Uses activity_log table for real statistics.
+    Returns up to 5 repositories with the most events.
     """
-    from datetime import datetime, timezone
+    # Get current time and 24 hours ago
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(hours=24)
     
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Get top repos by activity count for today
-    result = await session.execute(
+    # Query for repository activity in last 24 hours
+    query = (
         select(
             ActivityLog.repo_name,
             func.count(ActivityLog.id).label("event_count")
         )
         .where(
-            ActivityLog.created_at >= today_start,
+            ActivityLog.created_at >= yesterday,
+            ActivityLog.created_at <= now,
             ActivityLog.repo_name.isnot(None)
         )
         .group_by(ActivityLog.repo_name)
-        .order_by(func.count(ActivityLog.id).desc())
+        .order_by(desc("event_count"))
         .limit(5)
     )
     
+    result = await session.execute(query)
     repos = result.all()
     
-    # If no data, return empty list
     if not repos:
         return []
     
-    return [HotRepoStat(name=repo_name, events=count) for repo_name, count in repos]
+    # Build Gitea URL for each repo and detect language
+    base_url = settings.GITEA_URL.rstrip("/")
+    
+    return [
+        HotRepoStat(
+            name=repo_name,
+            url=f"{base_url}/{repo_name}",
+            events=count,
+            language=detect_language(repo_name)  # Helper function to detect language
+        )
+        for repo_name, count in repos
+    ]
 
 
 # Color palette for repository cards (matching frontend mock)
@@ -274,6 +288,61 @@ def get_initials(full_name: str) -> str:
     if len(parts) >= 2:
         return f"{parts[0][0]}{parts[1][0]}".upper()
     return full_name[:2].upper() if full_name else "??"
+
+
+def detect_language(repo_name: str) -> str | None:
+    """Detect programming language from repository name or return None."""
+    repo_lower = repo_name.lower()
+    
+    # Common language indicators in repo names
+    language_hints = {
+        "python": "Python",
+        "django": "Python",
+        "flask": "Python",
+        "fastapi": "Python",
+        "js": "JavaScript",
+        "javascript": "JavaScript",
+        "react": "JavaScript",
+        "vue": "JavaScript",
+        "angular": "JavaScript",
+        "ts": "TypeScript",
+        "typescript": "TypeScript",
+        "java": "Java",
+        "spring": "Java",
+        "kotlin": "Kotlin",
+        "android": "Kotlin",
+        "cpp": "C++",
+        "c++": "C++",
+        "c": "C",
+        "go": "Go",
+        "golang": "Go",
+        "rust": "Rust",
+        "rs": "Rust",
+        "ruby": "Ruby",
+        "rails": "Ruby",
+        "php": "PHP",
+        "laravel": "PHP",
+        "swift": "Swift",
+        "ios": "Swift",
+        "csharp": "C#",
+        "c#": "C#",
+        "dotnet": "C#",
+        "scala": "Scala",
+        "r": "R",
+        "matlab": "MATLAB",
+        "bash": "Shell",
+        "shell": "Shell",
+        "docker": "Docker",
+        "kubernetes": "Kubernetes",
+        "terraform": "Terraform",
+        "ansible": "Ansible",
+    }
+    
+    for hint, language in language_hints.items():
+        if hint in repo_lower:
+            return language
+    
+    return None
 
 
 class TodayStats(BaseModel):

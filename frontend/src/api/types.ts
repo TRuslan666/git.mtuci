@@ -84,7 +84,9 @@ export interface TodayStats {
 
 export interface HotRepoStat {
   name: string;
+  url: string;
   events: number;
+  language: string | null;
 }
 
 export interface TopUserStat {

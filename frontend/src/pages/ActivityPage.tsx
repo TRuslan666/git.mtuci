@@ -184,6 +184,37 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
           time: new Date()
         }, ...prev].slice(0, 5)); // Keep last 5
         
+        // Real-time update hot repos if repo_name exists
+        if (data.repo_name) {
+          setHotRepos(prev => {
+            const existing = prev.find(r => r.name === data.repo_name);
+            let updated: HotRepoStat[];
+            
+            if (existing) {
+              // Update existing repo
+              updated = prev.map(r => 
+                r.name === data.repo_name 
+                  ? { ...r, events: r.events + 1 }
+                  : r
+              );
+            } else {
+              // Add new repo to the list
+              const newRepo: HotRepoStat = {
+                name: data.repo_name,
+                url: data.repo_url || `#`,
+                events: 1,
+                language: null
+              };
+              updated = [...prev, newRepo];
+            }
+            
+            // Sort by events desc and take top 5
+            return updated
+              .sort((a, b) => b.events - a.events)
+              .slice(0, 5);
+          });
+        }
+        
         // Refresh stats after short delay
         setTimeout(() => loadData(), 500);
       } else if (data.type === "stats_updated") {
@@ -658,21 +689,75 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
               fontWeight: 600, color: colors.textPrimary, display: "flex", alignItems: "center", justifyContent: "space-between",
               background: colors.cardBg2
             }}>
-              Горячие репо <span style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: 400 }}>По событиям</span>
-            </div>
-            {hotRepos.map((repo, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: "8px", padding: "8px 14px",
-                borderBottom: i < hotRepos.length - 1 ? `0.5px solid ${colors.border}` : "none", fontSize: "12px"
-              }}>
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, stroke: colors.textMuted, strokeWidth: 1.2 }}>
-                  <rect x="2" y="1" width="12" height="14" rx="2"/>
-                  <path d="M5 5h6M5 8h6M5 11h3" strokeLinecap="round"/>
-                </svg>
-                <span style={{ flex: 1, color: colors.textPrimary, fontFamily: "monospace", fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.name}</span>
-                <span style={{ color: colors.textSecondary, fontSize: "11px", whiteSpace: "nowrap" }}>{repo.events} событие</span>
+              <span>Горячие репо</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: 400 }}>По событиям</span>
+                <div 
+                  title="Рейтинг репозиториев по количеству действий за последние 24 часа"
+                  style={{ cursor: "help", display: "flex", alignItems: "center" }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ stroke: colors.textMuted, strokeWidth: 1.5 }}>
+                    <circle cx="8" cy="8" r="6"/>
+                    <path d="M8 6.5V8M8 10.5h0" strokeLinecap="round"/>
+                  </svg>
+                </div>
               </div>
-            ))}
+            </div>
+            {hotRepos.length === 0 ? (
+              <div style={{ padding: "16px 14px", fontSize: "12px", color: colors.textSecondary, textAlign: "center" }}>
+                Сегодня пока затишье
+              </div>
+            ) : (
+              hotRepos.slice(0, 5).map((repo, i) => (
+                <a 
+                  key={i} 
+                  href={repo.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "8px", 
+                    padding: "8px 14px",
+                    borderBottom: i < Math.min(hotRepos.length, 5) - 1 ? `0.5px solid ${colors.border}` : "none", 
+                    fontSize: "12px",
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "background 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.cardBg2;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {repo.language ? (
+                    <span 
+                      title={repo.language}
+                      style={{ 
+                        fontSize: "10px", 
+                        padding: "2px 5px", 
+                        borderRadius: "3px", 
+                        background: colors.accent + "20",
+                        color: colors.accent,
+                        fontWeight: 500,
+                        flexShrink: 0
+                      }}
+                    >
+                      {repo.language.slice(0, 3).toUpperCase()}
+                    </span>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, stroke: colors.textMuted, strokeWidth: 1.2 }}>
+                      <rect x="2" y="1" width="12" height="14" rx="2"/>
+                      <path d="M5 5h6M5 8h6M5 11h3" strokeLinecap="round"/>
+                    </svg>
+                  )}
+                  <span style={{ flex: 1, color: colors.textPrimary, fontFamily: "monospace", fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.name}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: "11px", whiteSpace: "nowrap" }}>{repo.events} событие</span>
+                </a>
+              ))
+            )}
           </div>
         </div>
       </div>
