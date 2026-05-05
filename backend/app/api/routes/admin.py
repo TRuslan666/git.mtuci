@@ -16,6 +16,7 @@ from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
 from app.models.repository import Repository, RepositoryType
+from app.models.activity_log import ActivityLog, ActivityType
 from app.models.user import User, UserRole
 from app.schemas.repository import RepositoryRead
 from app.schemas.user import (
@@ -366,6 +367,15 @@ async def admin_list_repositories(
 
     repositories = []
     for repo, owner_name in repos_with_owners:
+        # Count commits from activity_log
+        commits_result = await session.execute(
+            select(func.count(ActivityLog.id)).where(
+                ActivityLog.repo_name == repo.gitea_repo_name,
+                ActivityLog.activity_type == ActivityType.commit
+            )
+        )
+        commits_count = commits_result.scalar() or 0
+
         repo_dict = {
             "id": repo.id,
             "name": repo.name,
@@ -374,7 +384,7 @@ async def admin_list_repositories(
             "clone_url": repo.clone_url,
             "owner_id": repo.owner_id,
             "owner_full_name": owner_name or repo.gitea_repo_name or "Unknown",
-            "commits_count": 0,
+            "commits_count": commits_count,
             "is_public": repo.repo_type == RepositoryType.public,
             "repo_type": repo.repo_type,
             "language": repo.language,
@@ -503,3 +513,141 @@ async def setup_gitea_system_webhook(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to create system webhook: {response.status_code} - {error_text}",
             )
+
+
+@router.post("/sync-gitea-repositories")
+async def sync_gitea_repositories(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Sync all repositories from Gitea to local database.
+    This is useful for initial sync or after webhook setup.
+    """
+    import logging
+    from app.models.repository import Repository, RepositoryType
+    from app.core.config import settings
+
+    logger = logging.getLogger(__name__)
+
+    async with httpx.AsyncClient() as client:
+        # Get all repositories from Gitea (using user repos endpoint with admin token)
+        response = await client.get(
+            f"{settings.GITEA_URL}/api/v1/user/repos",
+            headers={"Authorization": f"token {settings.GITEA_TOKEN}"},
+            timeout=30.0,
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Failed to fetch repositories from Gitea: {response.status_code}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch repositories from Gitea: {response.status_code}",
+            )
+
+        gitea_repos = response.json()
+        synced_count = 0
+        updated_count = 0
+
+        for gitea_repo in gitea_repos:
+            gitea_repo_id = gitea_repo.get("id")
+            full_name = gitea_repo.get("full_name")
+            description = gitea_repo.get("description")
+            clone_url = gitea_repo.get("clone_url")
+            is_private = gitea_repo.get("private", False)
+            language = gitea_repo.get("language")
+            owner_login = gitea_repo.get("owner", {}).get("login")
+
+            # Find user by login
+            user_id = None
+            if owner_login:
+                result = await session.execute(
+                    select(User.id).where(User.mtuci_login == owner_login)
+                )
+                user_id = result.scalar_one_or_none()
+
+            # Check if repo already exists
+            existing = await session.execute(
+                select(Repository).where(Repository.gitea_repo_id == gitea_repo_id)
+            )
+            repo = existing.scalar_one_or_none()
+
+            if repo:
+                # Update existing repo
+                repo.description = description
+                repo.clone_url = clone_url
+                repo.language = language
+                if user_id:
+                    repo.owner_id = user_id
+                updated_count += 1
+            else:
+                # Create new repo
+                new_repo = Repository(
+                    name=full_name.split("/")[-1] if "/" in full_name else full_name,
+                    description=description,
+                    gitea_repo_name=full_name,
+                    gitea_repo_id=gitea_repo_id,
+                    clone_url=clone_url,
+                    owner_id=user_id,
+                    repo_type=RepositoryType.private if is_private else RepositoryType.public,
+                    language=language,
+                )
+                session.add(new_repo)
+                synced_count += 1
+
+            # Sync commits for this repo
+            try:
+                commits_response = await client.get(
+                    f"{settings.GITEA_URL}/api/v1/repos/{full_name}/commits",
+                    headers={"Authorization": f"token {settings.GITEA_TOKEN}"},
+                    timeout=30.0,
+                )
+                if commits_response.status_code == 200:
+                    commits = commits_response.json()
+                    from app.models.activity_log import ActivityLog, ActivityType
+                    from datetime import datetime, timezone
+
+                    for commit in commits:
+                        # Check if commit already logged
+                        commit_sha = commit.get("sha")
+                        existing_commit = await session.execute(
+                            select(ActivityLog).where(
+                                ActivityLog.repo_name == full_name,
+                                ActivityLog.message.like(f"%{commit_sha[:7]}%")
+                            )
+                        )
+                        if not existing_commit.scalar_one_or_none():
+                            # Log commit
+                            commit_author = commit.get("commit", {}).get("author", {}).get("name")
+                            commit_message = commit.get("commit", {}).get("message", "")
+                            commit_date_str = commit.get("commit", {}).get("author", {}).get("date")
+
+                            # Try to find user by author name
+                            commit_user_id = user_id
+                            if not commit_user_id and commit_author:
+                                result = await session.execute(
+                                    select(User.id).where(User.full_name.ilike(f"%{commit_author}%"))
+                                )
+                                commit_user_id = result.scalar_one_or_none()
+
+                            activity = ActivityLog(
+                                user_id=commit_user_id,
+                                user_login=owner_login if not commit_user_id else None,
+                                activity_type=ActivityType.commit,
+                                repo_name=full_name,
+                                message=f"{commit_message[:100]} ({commit_sha[:7]})",
+                                created_at=datetime.fromisoformat(commit_date_str.replace("Z", "+00:00")) if commit_date_str else datetime.now(timezone.utc),
+                            )
+                            session.add(activity)
+            except Exception as e:
+                logger.warning(f"Failed to sync commits for {full_name}: {e}")
+
+        await session.commit()
+        logger.info(f"Synced {synced_count} new repos, updated {updated_count} existing repos from Gitea")
+
+        return {
+            "status": "ok",
+            "synced": synced_count,
+            "updated": updated_count,
+            "total": len(gitea_repos),
+        }
