@@ -104,44 +104,66 @@ def verify_webhook_signature(payload: bytes, signature: Optional[str]) -> bool:
     return match
 
 
-@router.post("/gitea/push")
-async def gitea_push_webhook(
+@router.post("/gitea")
+async def gitea_webhook(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Receive push events from Gitea.
-    Logs commits and push activity.
+    Universal webhook endpoint for all Gitea events.
+    Handles push, repository, fork, pull_request, and user events.
     """
+    # Get event type from header
+    event_type = request.headers.get("X-Gitea-Event", "push")
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received Gitea webhook event: {event_type}")
+
     # Get signature from headers
     signature = request.headers.get("X-Gitea-Signature")
-    
+
     # Read raw body for signature verification
     body = await request.body()
-    
+
     if not verify_webhook_signature(body, signature):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature"
         )
-    
-    # Parse payload
+
+    # Route to appropriate handler based on event type
+    if event_type == "push":
+        return await handle_push_event(body, session, logger)
+    elif event_type == "repository":
+        return await handle_repository_event(body, session, logger)
+    elif event_type == "fork":
+        return await handle_fork_event(body, session, logger)
+    elif event_type == "pull_request":
+        return await handle_pull_request_event(body, session, logger)
+    elif event_type in ("create", "delete"):
+        return await handle_repository_event(body, session, logger)
+    else:
+        logger.warning(f"Unhandled event type: {event_type}")
+        return {"status": "ok", "message": f"Event type {event_type} not handled"}
+
+
+async def handle_push_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+    """Handle push events."""
     try:
         payload = GiteaPushPayload.model_validate_json(body)
     except Exception as e:
+        logger.error(f"Invalid push payload: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid payload: {str(e)}"
+            detail=f"Invalid push payload: {str(e)}"
         )
     
     # Extract info
     repo_name = payload.repository.get("full_name", "unknown")
     pusher_email = payload.pusher.get("email", "")
     commit_count = len(payload.commits)
-    
+
     # Find user by email from Gitea
     user_id = None
-    logger = logging.getLogger(__name__)
     logger.info(f"Webhook received from pusher_email: {pusher_email}")
     if pusher_email:
         result = await session.execute(
@@ -184,8 +206,11 @@ async def gitea_push_webhook(
                         logger.warning(f"No user with sender login='{sender_name}'")
     else:
         logger.warning("No pusher_email in webhook payload")
-    
+
     if commit_count > 0:
+        # Get username from Gitea for logging
+        gitea_username = payload.pusher.get("username") or payload.sender.get("login")
+
         # Log push with commit count
         await log_push(
             session=session,
@@ -193,8 +218,9 @@ async def gitea_push_webhook(
             repo_name=repo_name,
             commit_count=commit_count,
             ip_address=None,
+            user_login=gitea_username if not user_id else None,
         )
-        
+
         # Log individual commits
         for commit in payload.commits:
             await log_commit(
@@ -203,8 +229,9 @@ async def gitea_push_webhook(
                 repo_name=repo_name,
                 commit_message=commit.message[:500],  # Truncate long messages
                 ip_address=None,
+                user_login=gitea_username if not user_id else None,
             )
-    
+
     # Broadcast real-time update to connected clients
     if user_id:
         result = await session.execute(
@@ -212,8 +239,9 @@ async def gitea_push_webhook(
         )
         user_name = result.scalar_one_or_none() or "Unknown"
     else:
-        user_name = "Unknown"
-    
+        # Use name from Gitea if user not found in DB
+        user_name = payload.pusher.get("username") or payload.sender.get("login") or "Unknown"
+
     await broadcast_new_activity(
         activity_type="push",
         user_name=user_name,
@@ -222,8 +250,196 @@ async def gitea_push_webhook(
         timestamp=datetime.now(timezone.utc).isoformat()
     )
     await broadcast_stats_update()
-    
+
     return {"status": "ok", "commits_logged": commit_count}
+
+
+async def handle_repository_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+    """Handle repository events (created, deleted)."""
+    try:
+        payload = GiteaRepositoryPayload.model_validate_json(body)
+    except Exception as e:
+        logger.error(f"Invalid repository payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid repository payload: {str(e)}"
+        )
+
+    repo_name = payload.repository.get("full_name", "unknown")
+    action = payload.action
+    sender_name = payload.sender.get("login", "")
+
+    # Try to find user by sender login
+    user_id = None
+    if sender_name:
+        result = await session.execute(
+            select(User.id).where(User.mtuci_login == sender_name)
+        )
+        user_row = result.scalar_one_or_none()
+        if user_row:
+            user_id = user_row
+
+    if action == "created":
+        await log_repo_created(
+            session=session,
+            user_id=user_id,
+            repo_name=repo_name,
+            ip_address=None,
+            user_login=sender_name if not user_id else None,
+        )
+        await broadcast_new_activity(
+            activity_type="repository_created",
+            user_name=sender_name or "Unknown",
+            repo_name=repo_name,
+            message="Repository created",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+    elif action == "deleted":
+        await log_repo_deleted(
+            session=session,
+            user_id=user_id,
+            repo_name=repo_name,
+            ip_address=None,
+            user_login=sender_name if not user_id else None,
+        )
+        await broadcast_new_activity(
+            activity_type="repository_deleted",
+            user_name=sender_name or "Unknown",
+            repo_name=repo_name,
+            message="Repository deleted",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+
+    await broadcast_stats_update()
+    return {"status": "ok", "action": action}
+
+
+async def handle_pull_request_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+    """Handle pull request events (opened, closed, merged)."""
+    try:
+        payload = GiteaPullRequestPayload.model_validate_json(body)
+    except Exception as e:
+        logger.error(f"Invalid pull request payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid pull request payload: {str(e)}"
+        )
+
+    repo_name = payload.repository.get("full_name", "unknown")
+    action = payload.action
+    pr_number = payload.number
+    pr_title = payload.pull_request.get("title", "Untitled")
+
+    # Find user by sender login
+    user_id = None
+    sender_name = payload.sender.get("login", "")
+    if sender_name:
+        result = await session.execute(
+            select(User.id).where(User.mtuci_login == sender_name)
+        )
+        user_row = result.scalar_one_or_none()
+        if user_row:
+            user_id = user_row
+
+    # Get user name for broadcast (use Gitea name if not found in DB)
+    if user_id:
+        result = await session.execute(
+            select(User.full_name).where(User.id == user_id)
+        )
+        user_name = result.scalar_one_or_none() or sender_name or "Unknown"
+    else:
+        user_name = sender_name or "Unknown"
+
+    if action == "opened":
+        await log_pull_request(
+            session=session,
+            user_id=user_id,
+            repo_name=repo_name,
+            pr_title=pr_title,
+            ip_address=None,
+            user_login=sender_name if not user_id else None,
+        )
+        await broadcast_new_activity(
+            activity_type="pull_request",
+            user_name=user_name,
+            repo_name=repo_name,
+            message=f"PR #{pr_number}: {pr_title}",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+    elif action == "merged":
+        await log_pr_merge(
+            session=session,
+            user_id=user_id,
+            repo_name=repo_name,
+            pr_number=pr_number,
+            ip_address=None,
+            user_login=sender_name if not user_id else None,
+        )
+        await broadcast_new_activity(
+            activity_type="pr_merge",
+            user_name=user_name,
+            repo_name=repo_name,
+            message=f"Merged PR #{pr_number}",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+
+    await broadcast_stats_update()
+    return {"status": "ok", "action": action, "pr_number": pr_number}
+
+
+async def handle_fork_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+    """Handle fork events."""
+    try:
+        payload = GiteaForkPayload.model_validate_json(body)
+    except Exception as e:
+        logger.error(f"Invalid fork payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid fork payload: {str(e)}"
+        )
+
+    source_repo = payload.repository.get("full_name", "unknown")
+    forked_repo = payload.forkee.get("full_name", "unknown")
+
+    # Find user by sender login
+    user_id = None
+    sender_name = payload.sender.get("login", "")
+    if sender_name:
+        result = await session.execute(
+            select(User.id).where(User.mtuci_login == sender_name)
+        )
+        user_row = result.scalar_one_or_none()
+        if user_row:
+            user_id = user_row
+
+    # Get user name for broadcast (use Gitea name if not found in DB)
+    if user_id:
+        result = await session.execute(
+            select(User.full_name).where(User.id == user_id)
+        )
+        user_name = result.scalar_one_or_none() or sender_name or "Unknown"
+    else:
+        user_name = sender_name or "Unknown"
+
+    await log_fork(
+        session=session,
+        user_id=user_id,
+        source_repo=source_repo,
+        forked_repo=forked_repo,
+        ip_address=None,
+        user_login=sender_name if not user_id else None,
+    )
+
+    await broadcast_new_activity(
+        activity_type="fork",
+        user_name=user_name,
+        repo_name=source_repo,
+        message=f"→ {forked_repo}",
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
+    await broadcast_stats_update()
+
+    return {"status": "ok", "source": source_repo, "fork": forked_repo}
 
 
 @router.post("/gitea/repository")

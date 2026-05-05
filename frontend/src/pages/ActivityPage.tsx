@@ -239,7 +239,8 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
 
   // Track if filters have changed (not on initial mount)
   const filtersChangedRef = useRef(false);
-  
+  const isInitialLoadRef = useRef(true);
+
   // Reset offset when filters change and reload data
   const handleFilterChange = useCallback((setter: (value: any) => void, value: any) => {
     setter(value);
@@ -250,12 +251,13 @@ export default function ActivityPage({ isDarkTheme = true }: ActivityPageProps) 
   // Initial load only - empty deps
   useEffect(() => {
     loadData();
+    isInitialLoadRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load data when filters or pagination change (skip initial mount)
   useEffect(() => {
-    if (filtersChangedRef.current) {
+    if (!isInitialLoadRef.current) {
       loadData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

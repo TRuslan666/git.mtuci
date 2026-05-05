@@ -93,8 +93,9 @@ async def get_recent_activity(
     activities = []
     for row in rows:
         activity, full_name, email = row
-        user_name = full_name or email or "Unknown"
-        
+        # Use user_login from Gitea if user not found in DB
+        user_name = full_name or email or activity.user_login or "Unknown"
+
         # Generate initials from user name
         initials = "".join([n[0].upper() for n in user_name.split() if n])[:2]
         if not initials:
@@ -126,6 +127,9 @@ async def get_recent_activity(
             ActivityType.logout: "#9ca3af",
         }
         
+        # Convert UTC to Moscow time (UTC+3)
+        moscow_time = activity.created_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=3))) if activity.created_at else None
+
         activities.append({
             "id": str(activity.id),
             "type": activity.activity_type.value,
@@ -134,9 +138,9 @@ async def get_recent_activity(
             "color": type_colors.get(activity.activity_type, "#60a5fa"),
             "repo": activity.repo_name or "",
             "message": activity.message or "",
-            "time": activity.created_at.strftime("%H:%M") if activity.created_at else "",
+            "time": moscow_time.strftime("%H:%M") if moscow_time else "",
             "tag": type_tags.get(activity.activity_type, activity.activity_type.value),
-            "timestamp": activity.created_at.isoformat() if activity.created_at else None,
+            "timestamp": moscow_time.isoformat() if moscow_time else None,
         })
     
     return {"activities": activities, "count": len(activities), "total": total_count}

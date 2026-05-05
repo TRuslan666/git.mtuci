@@ -20,10 +20,11 @@ async def log_activity(
     message: Optional[str] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """
     Log a user activity event.
-    
+
     Args:
         session: Database session
         user_id: ID of the user performing the action
@@ -32,12 +33,14 @@ async def log_activity(
         message: Optional description or commit message
         ip_address: Optional IP address of the user
         user_agent: Optional user agent string
-    
+        user_login: Optional username from external source (e.g., Gitea) if user not in DB
+
     Returns:
         The created ActivityLog entry
     """
     log_entry = ActivityLog(
         user_id=user_id,
+        user_login=user_login,
         activity_type=activity_type,
         repo_name=repo_name,
         message=message,
@@ -45,11 +48,11 @@ async def log_activity(
         user_agent=user_agent,
         created_at=datetime.now(timezone.utc),
     )
-    
+
     session.add(log_entry)
     await session.commit()
     await session.refresh(log_entry)
-    
+
     return log_entry
 
 
@@ -59,6 +62,7 @@ async def log_commit(
     repo_name: str,
     commit_message: str,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a commit activity."""
     return await log_activity(
@@ -68,6 +72,7 @@ async def log_commit(
         repo_name=repo_name,
         message=commit_message,
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -77,6 +82,7 @@ async def log_push(
     repo_name: str,
     commit_count: int = 1,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a push activity."""
     message = f"{commit_count} commit" + ("s" if commit_count > 1 else "")
@@ -87,6 +93,7 @@ async def log_push(
         repo_name=repo_name,
         message=message,
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -96,6 +103,7 @@ async def log_pull_request(
     repo_name: str,
     pr_title: str,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a pull request creation."""
     return await log_activity(
@@ -105,6 +113,7 @@ async def log_pull_request(
         repo_name=repo_name,
         message=pr_title,
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -114,6 +123,7 @@ async def log_pr_merge(
     repo_name: str,
     pr_number: int,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a PR merge."""
     return await log_activity(
@@ -123,6 +133,7 @@ async def log_pr_merge(
         repo_name=repo_name,
         message=f"PR #{pr_number} merged",
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -132,6 +143,7 @@ async def log_fork(
     source_repo: str,
     forked_repo: str,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a repository fork."""
     return await log_activity(
@@ -141,6 +153,7 @@ async def log_fork(
         repo_name=source_repo,
         message=f"→ {forked_repo}",
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -149,6 +162,7 @@ async def log_repo_created(
     user_id: UUID,
     repo_name: str,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a repository creation."""
     return await log_activity(
@@ -158,6 +172,7 @@ async def log_repo_created(
         repo_name=repo_name,
         message="Repository created",
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -166,6 +181,7 @@ async def log_repo_deleted(
     user_id: UUID,
     repo_name: str,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a repository deletion."""
     return await log_activity(
@@ -175,6 +191,7 @@ async def log_repo_deleted(
         repo_name=repo_name,
         message="Repository deleted",
         ip_address=ip_address,
+        user_login=user_login,
     )
 
 
@@ -183,6 +200,7 @@ async def log_login(
     user_id: UUID,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a user login."""
     return await log_activity(
@@ -191,6 +209,7 @@ async def log_login(
         activity_type=ActivityType.login,
         ip_address=ip_address,
         user_agent=user_agent,
+        user_login=user_login,
     )
 
 
@@ -198,6 +217,7 @@ async def log_logout(
     session: AsyncSession,
     user_id: UUID,
     ip_address: Optional[str] = None,
+    user_login: Optional[str] = None,
 ) -> ActivityLog:
     """Log a user logout."""
     return await log_activity(
@@ -205,4 +225,5 @@ async def log_logout(
         user_id=user_id,
         activity_type=ActivityType.logout,
         ip_address=ip_address,
+        user_login=user_login,
     )

@@ -409,3 +409,97 @@ async def admin_toggle_repository_block(
     await session.commit()
     await session.refresh(repository)
     return RepositoryRead.model_validate(repository)
+
+
+# System-wide Gitea webhook setup
+GITEA_URL = os.getenv("GITEA_URL", "http://gitea:3000")
+GITEA_TOKEN = os.getenv("GITEA_TOKEN", "")
+WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "http://api:8000/webhooks")
+WEBHOOK_SECRET = os.getenv("GITEA_WEBHOOK_SECRET", "")
+
+
+@router.post("/setup-gitea-webhook")
+async def setup_gitea_system_webhook(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Create system-wide webhook in Gitea to capture all events from all repositories.
+    This needs to be called once after Gitea is set up.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"GITEA_TOKEN configured: {bool(GITEA_TOKEN)}, length: {len(GITEA_TOKEN) if GITEA_TOKEN else 0}")
+    logger.info(f"GITEA_URL: {GITEA_URL}")
+    
+    if not GITEA_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GITEA_TOKEN not configured",
+        )
+    
+    async with httpx.AsyncClient() as client:
+        # Check if system webhook already exists
+        hooks_response = await client.get(
+            f"{GITEA_URL}/api/v1/admin/hooks",
+            headers={"Authorization": f"token {GITEA_TOKEN}"},
+            timeout=10.0,
+        )
+        
+        if hooks_response.status_code == 200:
+            hooks = hooks_response.json()
+            for hook in hooks:
+                config = hook.get("config", {})
+                if config.get("url") == f"{WEBHOOK_BASE_URL}/gitea":
+                    return {
+                        "status": "already_exists",
+                        "message": "System webhook already configured",
+                        "hook_id": hook.get("id"),
+                    }
+        
+        # Create system webhook for all events
+        logger.info(f"Creating system webhook -> {WEBHOOK_BASE_URL}/gitea")
+        
+        # Gitea system webhook API
+        response = await client.post(
+            f"{GITEA_URL}/api/v1/admin/hooks",
+            headers={
+                "Authorization": f"token {GITEA_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "type": "gitea",
+                "config": {
+                    "url": f"{WEBHOOK_BASE_URL}/gitea",
+                    "content_type": "json",
+                    "secret": WEBHOOK_SECRET,
+                },
+                "events": [
+                    "push",
+                    "create",
+                    "delete",
+                    "fork",
+                    "repository",
+                    "release",
+                ],
+                "active": True,
+            },
+            timeout=10.0,
+        )
+        
+        if response.status_code in (201, 200):
+            hook_data = response.json()
+            logger.info(f"System webhook created successfully: {hook_data.get('id')}")
+            return {
+                "status": "created",
+                "message": "System webhook created successfully",
+                "hook_id": hook_data.get("id"),
+                "events": ["push", "create", "delete", "fork", "repository", "release"],
+            }
+        else:
+            error_text = response.text[:500]
+            logger.error(f"Failed to create system webhook: {response.status_code} - {error_text}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create system webhook: {response.status_code} - {error_text}",
+            )

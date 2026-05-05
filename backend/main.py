@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +33,22 @@ from app.models.submission import Submission
 from sqlalchemy import select
 
 
-app = FastAPI(title="MTUCI Lab Submission API", version="0.1.0")
+app = FastAPI(
+    title="MTUCI API",
+    description="MTUCI Git Management API",
+    version="1.0.0",
+)
+
+# CORS для работы фронтенда в Docker
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001", "http://frontend:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Original FastAPI init continues belowtitle="MTUCI Lab Submission API", version="0.1.0")
 
 # Mount uploads directory for serving avatar images
 uploads_dir = Path(settings.UPLOAD_DIR)

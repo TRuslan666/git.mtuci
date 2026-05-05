@@ -21,6 +21,7 @@ from app.schemas.user import UserRead
 from app.services.password_reset_service import request_password_reset, reset_password_by_token
 from app.services.mtuci_service import fetch_student_info, MTUCIAuthError, MTUCIServiceError
 from app.services.user_service import get_next_student_id
+from app.services.activity_service import log_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -192,6 +193,13 @@ async def login(
     from datetime import datetime, timezone
     user_obj.last_login = datetime.now(timezone.utc)
     await session.commit()
+
+    # Log login activity
+    await log_login(
+        session=session,
+        user_id=user_obj.id,
+        ip_address=None,
+    )
 
     # JWT будет содержать `sub` = id пользователя (это используется в `/auth/me`)
     # Если remember_me=True, токен живет 30 дней, иначе 1 день

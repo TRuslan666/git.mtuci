@@ -1,18 +1,19 @@
 """
 Stats API routes - для дашборда и аналитики
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
+from app.core.config import settings
 from app.models.repository import Repository, RepositoryType
 from app.models.user import User, UserRole
 from app.models.activity_log import ActivityLog, ActivityType
@@ -166,54 +167,58 @@ async def get_top_users(
 ) -> list[TopUserStat]:
     """
     Get top 5 users by commits for today.
-    
-    Note: Uses activity_log table for real statistics.
+
+    Note: Uses activity_log table for real statistics. Includes users from Gitea via user_login.
     """
-    from datetime import datetime, timezone
-    
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import text
+
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Get top users by commit count for today
+
+    # Get top users by commit count for today (including users without user_id)
+    # Use UNION to combine users from DB and users from Gitea (user_login)
     result = await session.execute(
-        select(
-            User.id,
-            User.full_name,
-            func.count(ActivityLog.id).label("commit_count")
-        )
-        .join(ActivityLog, User.id == ActivityLog.user_id)
-        .where(
-            ActivityLog.activity_type == ActivityType.commit,
-            ActivityLog.created_at >= today_start
-        )
-        .group_by(User.id, User.full_name)
-        .order_by(func.count(ActivityLog.id).desc())
-        .limit(5)
+        text("""
+            SELECT
+                COALESCE(u.id::text, al.user_login) as user_id,
+                COALESCE(u.full_name, al.user_login) as user_name,
+                COUNT(*) as commit_count
+            FROM activity_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            WHERE al.activity_type = 'commit'
+              AND al.created_at >= :today_start
+              AND (al.user_id IS NOT NULL OR al.user_login IS NOT NULL)
+            GROUP BY COALESCE(u.id::text, al.user_login), COALESCE(u.full_name, al.user_login)
+            ORDER BY commit_count DESC
+            LIMIT 5
+        """),
+        {"today_start": today_start}
     )
-    
+
     users = result.all()
-    
+
     # If no data, return empty list
     if not users:
         return []
-    
+
     # Calculate max count for percent calculation
     max_count = max(user.commit_count for user in users) if users else 1
-    
+
     def get_initials(full_name: str) -> str:
         parts = full_name.strip().split()
         if len(parts) >= 2:
             return f"{parts[0][0]}{parts[1][0]}".upper()
         return full_name[:2].upper() if full_name else "??"
-    
+
     # Colors for top users (matching frontend)
     colors = ["#60a5fa", "#fbbf24", "#a78bfa", "#4caf50", "#e24b4a"]
-    
+
     return [
         TopUserStat(
-            user_id=str(user.id),
-            user_name=user.full_name,
-            name=user.full_name,
-            initials=get_initials(user.full_name),
+            user_id=str(user.user_id),
+            user_name=user.user_name,
+            name=user.user_name,
+            initials=get_initials(user.user_name),
             color=colors[i % len(colors)],
             count=user.commit_count,
             percent=int((user.commit_count / max_count) * 100)
@@ -371,33 +376,44 @@ async def get_hourly_activity(
 ) -> list[HourlyActivity]:
     """
     Get activity count by hour for today (24 hour bars).
-    
-    Note: Uses activity_log table for real statistics.
+
+    Note: Uses activity_log table for real statistics. Time is in Moscow timezone (UTC+3).
     """
-    from datetime import datetime, timezone
-    
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    current_hour = datetime.now(timezone.utc).hour
-    
-    # Get activity count by hour for today
+    from datetime import datetime, timedelta, timezone
+
+    # Moscow timezone (UTC+3)
+    moscow_tz = timezone(timedelta(hours=3))
+    now_moscow = datetime.now(timezone.utc).astimezone(moscow_tz)
+    today_start_moscow = now_moscow.replace(hour=0, minute=0, second=0, microsecond=0)
+    current_hour_moscow = now_moscow.hour
+
+    # Convert today_start back to UTC for database query
+    today_start_utc = today_start_moscow.astimezone(timezone.utc)
+
+    # Get activity count by hour for today (convert to Moscow time)
+    # Use subquery to handle timezone conversion before grouping
+    from sqlalchemy import text
+
     result = await session.execute(
-        select(
-            func.extract('hour', ActivityLog.created_at).label("hour"),
-            func.count(ActivityLog.id).label("event_count")
-        )
-        .where(ActivityLog.created_at >= today_start)
-        .group_by(func.extract('hour', ActivityLog.created_at))
-        .order_by(func.extract('hour', ActivityLog.created_at))
+        text("""
+            SELECT EXTRACT(HOUR FROM (created_at + INTERVAL '3 hours')) as hour,
+                   COUNT(*) as event_count
+            FROM activity_log
+            WHERE created_at >= :today_start
+            GROUP BY EXTRACT(HOUR FROM (created_at + INTERVAL '3 hours'))
+            ORDER BY hour
+        """),
+        {"today_start": today_start_utc}
     )
-    
+
     hourly_data = {int(row.hour): row.event_count for row in result.all()}
-    
+
     # Fill in missing hours with 0
     return [
         HourlyActivity(
             hour=i,
             count=hourly_data.get(i, 0),
-            is_current=(i == current_hour)
+            is_current=(i == current_hour_moscow)
         )
         for i in range(24)
     ]

@@ -18,6 +18,7 @@ from app.schemas.repository import (
     RepositoryRead,
     RepositoryUpdateRequest,
 )
+from app.services.activity_service import log_repo_created, log_repo_deleted
 
 router = APIRouter(tags=["repositories"])
 
@@ -110,6 +111,61 @@ async def create_gitea_repository(name: str, description: Optional[str], owner_u
         return response.json()
 
 
+async def create_gitea_webhook(owner: str, repo_name: str) -> None:
+    """Create webhook in Gitea repository to notify backend about events."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not GITEA_TOKEN:
+        logger.warning("GITEA_TOKEN not configured, skipping webhook creation")
+        return
+    
+    # URL для webhook - используем имя сервиса api из docker-compose
+    webhook_url = os.getenv("WEBHOOK_BASE_URL", "http://api:8000/webhooks")
+    secret = os.getenv("GITEA_WEBHOOK_SECRET", "")
+    
+    async with httpx.AsyncClient() as client:
+        # Check if webhook already exists
+        hooks_response = await client.get(
+            f"{GITEA_URL}/api/v1/repos/{owner}/{repo_name}/hooks",
+            headers={"Authorization": f"token {GITEA_TOKEN}"},
+            timeout=10.0,
+        )
+        
+        if hooks_response.status_code == 200:
+            hooks = hooks_response.json()
+            for hook in hooks:
+                if hook.get("config", {}).get("url") == f"{webhook_url}/gitea/push":
+                    logger.info(f"Webhook already exists for {owner}/{repo_name}")
+                    return
+        
+        # Create webhook for push events
+        logger.info(f"Creating webhook for {owner}/{repo_name} -> {webhook_url}/gitea/push")
+        response = await client.post(
+            f"{GITEA_URL}/api/v1/repos/{owner}/{repo_name}/hooks",
+            headers={
+                "Authorization": f"token {GITEA_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "type": "gitea",
+                "config": {
+                    "url": f"{webhook_url}/gitea/push",
+                    "content_type": "json",
+                    "secret": secret,
+                },
+                "events": ["push"],
+                "active": True,
+            },
+            timeout=10.0,
+        )
+        
+        if response.status_code in (201, 200):
+            logger.info(f"Webhook created successfully for {owner}/{repo_name}")
+        else:
+            logger.warning(f"Failed to create webhook: {response.status_code} - {response.text[:200]}")
+
+
 async def delete_gitea_repository(owner: str, repo_name: str) -> None:
     """Delete a repository in Gitea via API."""
     if not GITEA_TOKEN:
@@ -189,6 +245,9 @@ async def create_repository(
             clone_url = gitea_repo.get("clone_url") or f"{GITEA_URL}/{owner_username}/{payload.name}.git"
             gitea_repo_name = gitea_repo.get("name") or payload.name
             logger.info(f"Gitea repo created successfully: {clone_url}")
+            
+            # Create webhook for automatic activity tracking
+            await create_gitea_webhook(owner=owner_username, repo_name=payload.name)
         except Exception as e:
             # Log but don't fail - create repo in DB only
             logger.warning(f"Gitea repo creation failed (will create in DB only): {e}")
@@ -203,6 +262,15 @@ async def create_repository(
         session.add(repository)
         await session.commit()
         await session.refresh(repository)
+
+        # Log repository creation activity
+        await log_repo_created(
+            session=session,
+            user_id=current_user.id,
+            repo_name=repository.name,
+            ip_address=None,
+        )
+
         return RepositoryRead.model_validate(repository)
     except HTTPException:
         raise
@@ -310,8 +378,18 @@ async def delete_repository(
     owner_username = current_user.email.split("@")[0]
     await delete_gitea_repository(owner_username, repository.gitea_repo_name or repository.name)
 
+    repo_name = repository.name
     await session.delete(repository)
     await session.commit()
+
+    # Log repository deletion activity
+    await log_repo_deleted(
+        session=session,
+        user_id=current_user.id,
+        repo_name=repo_name,
+        ip_address=None,
+    )
+
     return None
 
 
