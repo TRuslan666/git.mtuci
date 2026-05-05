@@ -32,7 +32,7 @@ class RepositoryRead(BaseModel):
     description: Optional[str]
     gitea_repo_name: Optional[str]
     clone_url: Optional[str]
-    owner_id: UUID
+    owner_id: Optional[UUID] = None
     owner_full_name: Optional[str] = None
     commits_count: int = 0
     is_public: bool = True

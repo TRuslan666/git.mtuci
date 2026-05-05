@@ -25,11 +25,12 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     gitea_repo_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gitea_repo_id: Mapped[int | None] = mapped_column(nullable=True, index=True)  # Gitea repository ID for sync
     clone_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    owner_id: Mapped[UUID] = mapped_column(
+    owner_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     created_at: Mapped[datetime] = mapped_column(

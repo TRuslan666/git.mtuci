@@ -268,6 +268,11 @@ async def handle_repository_event(body: bytes, session: AsyncSession, logger: lo
     repo_name = payload.repository.get("full_name", "unknown")
     action = payload.action
     sender_name = payload.sender.get("login", "")
+    gitea_repo_id = payload.repository.get("id")
+    repo_description = payload.repository.get("description")
+    clone_url = payload.repository.get("clone_url")
+    is_private = payload.repository.get("private", False)
+    repo_language = payload.repository.get("language")  # Gitea determines primary language
 
     # Try to find user by sender login
     user_id = None
@@ -279,7 +284,28 @@ async def handle_repository_event(body: bytes, session: AsyncSession, logger: lo
         if user_row:
             user_id = user_row
 
+    from app.models.repository import Repository, RepositoryType
+
     if action == "created":
+        # Sync repository to local database
+        existing_repo = await session.execute(
+            select(Repository).where(Repository.gitea_repo_id == gitea_repo_id)
+        )
+        if not existing_repo.scalar_one_or_none():
+            new_repo = Repository(
+                name=repo_name.split("/")[-1] if "/" in repo_name else repo_name,
+                description=repo_description,
+                gitea_repo_name=repo_name,
+                gitea_repo_id=gitea_repo_id,
+                clone_url=clone_url,
+                owner_id=user_id,
+                repo_type=RepositoryType.private if is_private else RepositoryType.public,
+                language=repo_language,
+            )
+            session.add(new_repo)
+            await session.commit()
+            logger.info(f"Synced new repository from Gitea: {repo_name}")
+
         await log_repo_created(
             session=session,
             user_id=user_id,
@@ -295,6 +321,16 @@ async def handle_repository_event(body: bytes, session: AsyncSession, logger: lo
             timestamp=datetime.now(timezone.utc).isoformat()
         )
     elif action == "deleted":
+        # Remove from local database
+        existing_repo = await session.execute(
+            select(Repository).where(Repository.gitea_repo_id == gitea_repo_id)
+        )
+        repo = existing_repo.scalar_one_or_none()
+        if repo:
+            await session.delete(repo)
+            await session.commit()
+            logger.info(f"Deleted repository from local DB: {repo_name}")
+
         await log_repo_deleted(
             session=session,
             user_id=user_id,

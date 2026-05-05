@@ -348,7 +348,7 @@ async def admin_list_repositories(
     session: AsyncSession = Depends(get_session),
 ) -> List[RepositoryRead]:
     """Get all repositories with optional filters and pagination (admin only)."""
-    query = select(Repository, User.full_name.label("owner_name")).join(
+    query = select(Repository, User.full_name.label("owner_name")).outerjoin(
         User, Repository.owner_id == User.id
     )
 
@@ -373,7 +373,7 @@ async def admin_list_repositories(
             "gitea_repo_name": repo.gitea_repo_name,
             "clone_url": repo.clone_url,
             "owner_id": repo.owner_id,
-            "owner_full_name": owner_name,
+            "owner_full_name": owner_name or repo.gitea_repo_name or "Unknown",
             "commits_count": 0,
             "is_public": repo.repo_type == RepositoryType.public,
             "repo_type": repo.repo_type,
