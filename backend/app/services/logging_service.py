@@ -6,6 +6,7 @@ Provides functions to track backend events across different modules.
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
+import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,6 +64,50 @@ async def log_event(
     await session.refresh(log_entry)
     
     return log_entry
+
+
+async def log_event_background(
+    level: LogLevel,
+    source: LogSource,
+    message: str,
+    ip_address: str,
+    user_id: Optional[UUID] = None,
+    user_email: Optional[str] = None,
+    user_full_name: Optional[str] = None,
+    detail: Optional[str] = None,
+    http_status: Optional[int] = None,
+    request_id: Optional[str] = None,
+) -> None:
+    """
+    Log a system event in background (non-blocking).
+    Creates a new database session for the background task.
+    
+    This is useful for logging that shouldn't block the main request flow.
+    """
+    from app.core.database import SessionLocal
+    
+    async with SessionLocal() as session:
+        try:
+            log_entry = SystemLog(
+                level=level,
+                source=source,
+                user_id=user_id,
+                user_email=user_email,
+                user_full_name=user_full_name,
+                message=message,
+                detail=detail,
+                ip_address=ip_address,
+                http_status=http_status,
+                request_id=request_id,
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(log_entry)
+            await session.commit()
+        except Exception as e:
+            # Log to stdout if DB write fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to log event in background: {e}")
 
 
 async def log_error(

@@ -1,6 +1,7 @@
 from typing import Optional
+import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.security import create_access_token, get_current_user, verify_password
 from app.models.user import User, UserRole
+from app.models.system_log import LogLevel, LogSource
 from app.schemas.auth import (
     AuthLoginRequest,
     AuthRegisterRequest,
@@ -22,8 +24,22 @@ from app.services.password_reset_service import request_password_reset, reset_pa
 from app.services.mtuci_service import fetch_student_info, MTUCIAuthError, MTUCIServiceError
 from app.services.user_service import get_next_student_id
 from app.services.activity_service import log_login
+from app.services.logging_service import log_info, log_warning, log_event_background
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    # Check X-Forwarded-For header (set by reverse proxy)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+        # Take the first one (original client)
+        return forwarded_for.split(",")[0].strip()
+    
+    # Fallback to direct connection
+    return request.client.host if request.client else "unknown"
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -166,11 +182,22 @@ async def register_teacher(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: AuthLoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ):
+    ip_address = get_client_ip(request)
+    
     user = await session.execute(select(User).where(User.email == str(payload.email)))
     user_obj = user.scalar_one_or_none()
     if not user_obj:
+        # Log failed login attempt in background
+        asyncio.create_task(log_event_background(
+            level=LogLevel.WARNING,
+            source=LogSource.auth,
+            message=f"Failed login attempt for email: {payload.email}",
+            ip_address=ip_address,
+            user_email=str(payload.email),
+        ))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный email или пароль",
@@ -178,12 +205,32 @@ async def login(
 
     is_password_valid = verify_password(payload.password, user_obj.password_hash)
     if not is_password_valid:
+        # Log failed login attempt in background
+        asyncio.create_task(log_event_background(
+            level=LogLevel.WARNING,
+            source=LogSource.auth,
+            message=f"Failed login attempt for user: {user_obj.email}",
+            ip_address=ip_address,
+            user_id=user_obj.id,
+            user_email=user_obj.email,
+            user_full_name=user_obj.full_name,
+        ))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный email или пароль",
         )
 
     if getattr(user_obj, "is_blocked", False):
+        # Log blocked user login attempt in background
+        asyncio.create_task(log_event_background(
+            level=LogLevel.WARNING,
+            source=LogSource.auth,
+            message=f"Blocked user attempted login: {user_obj.email}",
+            ip_address=ip_address,
+            user_id=user_obj.id,
+            user_email=user_obj.email,
+            user_full_name=user_obj.full_name,
+        ))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is blocked",
@@ -194,11 +241,23 @@ async def login(
     user_obj.last_login = datetime.now(timezone.utc)
     await session.commit()
 
-    # Log login activity
+    # Log successful login in background
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.auth,
+        message=f"Successful login for user: {user_obj.email}",
+        ip_address=ip_address,
+        user_id=user_obj.id,
+        user_email=user_obj.email,
+        user_full_name=user_obj.full_name,
+        http_status=200,
+    ))
+
+    # Log login activity (activity log)
     await log_login(
         session=session,
         user_id=user_obj.id,
-        ip_address=None,
+        ip_address=ip_address,
     )
 
     # JWT будет содержать `sub` = id пользователя (это используется в `/auth/me`)

@@ -4,7 +4,8 @@ Roles and permissions API routes
 from typing import List, Optional
 from datetime import datetime, timezone
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +17,21 @@ from app.core.permissions import (
     invalidate_role_permissions_cache,
 )
 from app.models.user import User, UserRole
+from app.models.system_log import LogLevel, LogSource
 from app.models.role_permissions import RolePermission, TrustedAssistant
 from app.models.permission_audit import PermissionAudit
 from app.services.permission_service import log_permission_change, get_audit_logs
+from app.services.logging_service import log_event_background
 
 router = APIRouter(prefix="/roles", tags=["roles"])
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 @router.get("/my-permissions")
@@ -274,11 +285,14 @@ async def get_laborants(
 @router.post("/permissions/{role}")
 async def save_role_permissions(
     role: UserRole,
+    request: Request,
     permissions: List[CategoryInput],
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Save permission changes for a role (admin only)."""
+    ip_address = get_client_ip(request)
+    
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Only admins can modify permissions")
     
@@ -315,6 +329,18 @@ async def save_role_permissions(
     
     await session.commit()
     
+    # Log permission change in system logs
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.permissions,
+        message=f"Updated permissions for role: {role.value}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=200,
+    ))
+    
     # Invalidate cache so users pick up new permissions immediately
     invalidate_role_permissions_cache(role)
     
@@ -324,10 +350,13 @@ async def save_role_permissions(
 @router.post("/permissions/{role}/reset")
 async def reset_role_permissions(
     role: UserRole,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Reset permissions to defaults for a role (admin only)."""
+    ip_address = get_client_ip(request)
+    
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Only admins can reset permissions")
     
@@ -346,6 +375,18 @@ async def reset_role_permissions(
     )
     
     await session.commit()
+    
+    # Log permission reset in system logs
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.permissions,
+        message=f"Reset permissions to defaults for role: {role.value}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=200,
+    ))
     
     # Invalidate cache so users pick up default permissions immediately
     invalidate_role_permissions_cache(role)

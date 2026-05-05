@@ -1,13 +1,14 @@
 import os
 import secrets
 import string
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
 import httpx
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,7 @@ from app.services.user_service import (
     reset_user_password,
     update_user_role_and_block,
 )
+from app.services.logging_service import log_event_background
 
 
 class SystemMetrics(BaseModel):
@@ -56,6 +58,14 @@ class BackupInfo(BaseModel):
     next_backup: str | None
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def _require_admin(current_user: User) -> None:
@@ -123,10 +133,12 @@ async def admin_patch_user(
 @require_permission("user_edit")
 async def admin_approve_user(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
     """Approve pending user."""
+    ip_address = get_client_ip(request)
     _check_not_self(current_user, user_id)
 
     result = await session.execute(select(User).where(User.id == user_id))
@@ -138,6 +150,19 @@ async def admin_approve_user(
     user.is_pending = False
     await session.commit()
     await session.refresh(user)
+
+    # Log approval
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.admin,
+        message=f"Approved user: {user.email}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=200,
+    ))
+
     return AdminUserRead.model_validate(user)
 
 
@@ -145,9 +170,11 @@ async def admin_approve_user(
 @require_permission("user_delete")
 async def admin_delete_user(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    ip_address = get_client_ip(request)
     _check_not_self(current_user, user_id)
 
     # Fetch target user and check if admin
@@ -157,7 +184,21 @@ async def admin_delete_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     _check_target_not_admin(target_user)
 
+    user_email = target_user.email
+
     await delete_user_by_id(session, user_id)
+
+    # Log deletion
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.admin,
+        message=f"Deleted user: {user_email}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=204,
+    ))
 
     # Важно: явно возвращаем Response, чтобы FastAPI не пытался сериализовать body.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -880,27 +921,34 @@ async def export_logs(
 
 @router.delete("/logs/old")
 async def delete_old_logs(
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(30, ge=0, le=365),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Delete logs older than specified days."""
+    """Delete logs older than specified days. If days=0, delete all logs."""
     _require_admin(current_user)
 
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    if days == 0:
+        # Delete all logs
+        count_result = await session.execute(select(func.count()).select_from(SystemLog))
+        deleted_count = count_result.scalar() or 0
+        
+        await session.execute(SystemLog.__table__.delete())
+    else:
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Get count before deletion
-    count_result = await session.execute(
-        select(func.count())
-        .select_from(SystemLog)
-        .where(SystemLog.created_at < cutoff_date)
-    )
-    deleted_count = count_result.scalar() or 0
+        # Get count before deletion
+        count_result = await session.execute(
+            select(func.count())
+            .select_from(SystemLog)
+            .where(SystemLog.created_at < cutoff_date)
+        )
+        deleted_count = count_result.scalar() or 0
 
-    # Delete
-    await session.execute(
-        SystemLog.__table__.delete().where(SystemLog.created_at < cutoff_date)
-    )
+        # Delete
+        await session.execute(
+            SystemLog.__table__.delete().where(SystemLog.created_at < cutoff_date)
+        )
 
     await session.commit()
 

@@ -1,10 +1,11 @@
 import os
+import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,7 @@ from app.core.database import get_session
 from app.core.security import get_current_user
 from app.core.permissions import require_permission
 from app.models.repository import Repository, RepositoryType
+from app.models.system_log import LogLevel, LogSource
 from app.models.user import User
 from app.schemas.repository import (
     RepositoryCreateRequest,
@@ -19,12 +21,21 @@ from app.schemas.repository import (
     RepositoryUpdateRequest,
 )
 from app.services.activity_service import log_repo_created, log_repo_deleted
+from app.services.logging_service import log_info, log_warning, log_event_background
 
 router = APIRouter(tags=["repositories"])
 
 GITEA_URL = os.getenv("GITEA_URL", "http://gitea:3000")
 GITEA_TOKEN = os.getenv("GITEA_TOKEN", "")
 GITEA_ADMIN = os.getenv("GITEA_ADMIN_USERNAME", "gitea_admin")
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 async def create_gitea_repository(name: str, description: Optional[str], owner_username: str) -> dict:
@@ -198,12 +209,14 @@ async def list_my_repositories(
 @require_permission("repo_create")
 async def create_repository(
     payload: RepositoryCreateRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new repository."""
     import logging
     logger = logging.getLogger(__name__)
+    ip_address = get_client_ip(request)
     
     try:
         logger.info(f"Creating repository for user {current_user.id}, email: {current_user.email}")
@@ -224,6 +237,7 @@ async def create_repository(
         # Create repository in Gitea (optional)
         clone_url = None
         gitea_repo_name = None
+        gitea_success = False
         try:
             # Log all user attributes for debugging
             logger.info(f"User object: id={current_user.id}, email={current_user.email}, full_name={current_user.full_name}")
@@ -244,6 +258,7 @@ async def create_repository(
             # Build clone URL
             clone_url = gitea_repo.get("clone_url") or f"{GITEA_URL}/{owner_username}/{payload.name}.git"
             gitea_repo_name = gitea_repo.get("name") or payload.name
+            gitea_success = True
             logger.info(f"Gitea repo created successfully: {clone_url}")
             
             # Create webhook for automatic activity tracking
@@ -262,6 +277,29 @@ async def create_repository(
         session.add(repository)
         await session.commit()
         await session.refresh(repository)
+
+        # Log repository creation in system logs (background)
+        asyncio.create_task(log_event_background(
+            level=LogLevel.INFO,
+            source=LogSource.repositories,
+            message=f"Created repository: {payload.name}",
+            ip_address=ip_address,
+            user_id=current_user.id,
+            user_email=current_user.email,
+            user_full_name=current_user.full_name,
+            http_status=201,
+        ))
+
+        if not gitea_success:
+            asyncio.create_task(log_event_background(
+                level=LogLevel.WARNING,
+                source=LogSource.repositories,
+                message=f"Repository created in DB but Gitea creation failed: {payload.name}",
+                ip_address=ip_address,
+                user_id=current_user.id,
+                user_email=current_user.email,
+                user_full_name=current_user.full_name,
+            ))
 
         # Log repository creation activity
         await log_repo_created(
@@ -357,10 +395,13 @@ async def update_repository(
 @require_permission("repo_delete")
 async def delete_repository(
     repository_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Delete a repository."""
+    ip_address = get_client_ip(request)
+    
     result = await session.execute(
         select(Repository).where(
             Repository.id == repository_id,
@@ -381,6 +422,18 @@ async def delete_repository(
     repo_name = repository.name
     await session.delete(repository)
     await session.commit()
+
+    # Log repository deletion in system logs (background)
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.repositories,
+        message=f"Deleted repository: {repo_name}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=204,
+    ))
 
     # Log repository deletion activity
     await log_repo_deleted(

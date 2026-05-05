@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -22,6 +22,7 @@ from app.api.routes.activity import router as activity_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
+from app.core.logging_middleware import LoggingMiddleware
 from app.models.user import User, UserRole
 from app.models.assignment_file import AssignmentFile  # Import BEFORE Assignment
 from app.models.assignment import Assignment
@@ -47,6 +48,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add logging middleware for automatic request logging
+app.add_middleware(LoggingMiddleware)
 
 # Original FastAPI init continues belowtitle="MTUCI Lab Submission API", version="0.1.0")
 

@@ -4,6 +4,7 @@ Webhook endpoints for receiving events from external services (Gitea, etc.)
 import os
 import hmac
 import hashlib
+import asyncio
 from typing import Optional
 import logging
 from datetime import datetime, timezone
@@ -15,7 +16,9 @@ from sqlalchemy import select
 
 from app.core.database import get_session
 from app.models.user import User
+from app.models.system_log import LogLevel, LogSource
 from app.services.activity_service import log_commit, log_push, log_repo_created, log_repo_deleted, log_pull_request, log_pr_merge, log_fork, log_login
+from app.services.logging_service import log_event_background
 from app.core.security import get_current_user
 from app.api.routes.websocket import broadcast_new_activity, broadcast_stats_update
 
@@ -23,6 +26,14 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 # Secret for webhook verification (should be set in environment)
 WEBHOOK_SECRET = os.getenv("GITEA_WEBHOOK_SECRET", "")
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 class GiteaCommit(BaseModel):
@@ -113,10 +124,20 @@ async def gitea_webhook(
     Universal webhook endpoint for all Gitea events.
     Handles push, repository, fork, pull_request, and user events.
     """
+    ip_address = get_client_ip(request)
+    
     # Get event type from header
     event_type = request.headers.get("X-Gitea-Event", "push")
     logger = logging.getLogger(__name__)
     logger.info(f"Received Gitea webhook event: {event_type}")
+
+    # Log webhook receipt
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.webhooks,
+        message=f"Received Gitea webhook event: {event_type}",
+        ip_address=ip_address,
+    ))
 
     # Get signature from headers
     signature = request.headers.get("X-Gitea-Signature")
@@ -125,6 +146,13 @@ async def gitea_webhook(
     body = await request.body()
 
     if not verify_webhook_signature(body, signature):
+        # Log failed signature verification
+        asyncio.create_task(log_event_background(
+            level=LogLevel.ERROR,
+            source=LogSource.webhooks,
+            message=f"Invalid webhook signature for event: {event_type}",
+            ip_address=ip_address,
+        ))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature"
@@ -132,21 +160,27 @@ async def gitea_webhook(
 
     # Route to appropriate handler based on event type
     if event_type == "push":
-        return await handle_push_event(body, session, logger)
+        return await handle_push_event(body, session, logger, ip_address)
     elif event_type == "repository":
-        return await handle_repository_event(body, session, logger)
+        return await handle_repository_event(body, session, logger, ip_address)
     elif event_type == "fork":
-        return await handle_fork_event(body, session, logger)
+        return await handle_fork_event(body, session, logger, ip_address)
     elif event_type == "pull_request":
-        return await handle_pull_request_event(body, session, logger)
+        return await handle_pull_request_event(body, session, logger, ip_address)
     elif event_type in ("create", "delete"):
-        return await handle_repository_event(body, session, logger)
+        return await handle_repository_event(body, session, logger, ip_address)
     else:
         logger.warning(f"Unhandled event type: {event_type}")
+        asyncio.create_task(log_event_background(
+            level=LogLevel.WARNING,
+            source=LogSource.webhooks,
+            message=f"Unhandled event type: {event_type}",
+            ip_address=ip_address,
+        ))
         return {"status": "ok", "message": f"Event type {event_type} not handled"}
 
 
-async def handle_push_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+async def handle_push_event(body: bytes, session: AsyncSession, logger: logging.Logger, ip_address: str = "unknown") -> dict:
     """Handle push events."""
     try:
         payload = GiteaPushPayload.model_validate_json(body)
@@ -254,7 +288,7 @@ async def handle_push_event(body: bytes, session: AsyncSession, logger: logging.
     return {"status": "ok", "commits_logged": commit_count}
 
 
-async def handle_repository_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+async def handle_repository_event(body: bytes, session: AsyncSession, logger: logging.Logger, ip_address: str = "unknown") -> dict:
     """Handle repository events (created, deleted)."""
     try:
         payload = GiteaRepositoryPayload.model_validate_json(body)
@@ -350,7 +384,7 @@ async def handle_repository_event(body: bytes, session: AsyncSession, logger: lo
     return {"status": "ok", "action": action}
 
 
-async def handle_pull_request_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+async def handle_pull_request_event(body: bytes, session: AsyncSession, logger: logging.Logger, ip_address: str = "unknown") -> dict:
     """Handle pull request events (opened, closed, merged)."""
     try:
         payload = GiteaPullRequestPayload.model_validate_json(body)
@@ -423,7 +457,7 @@ async def handle_pull_request_event(body: bytes, session: AsyncSession, logger: 
     return {"status": "ok", "action": action, "pr_number": pr_number}
 
 
-async def handle_fork_event(body: bytes, session: AsyncSession, logger: logging.Logger) -> dict:
+async def handle_fork_event(body: bytes, session: AsyncSession, logger: logging.Logger, ip_address: str = "unknown") -> dict:
     """Handle fork events."""
     try:
         payload = GiteaForkPayload.model_validate_json(body)

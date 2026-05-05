@@ -23,3 +23,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
         yield session
 
+
+async def get_async_session() -> AsyncSession:
+    """Get a new async session (for background tasks)."""
+    return SessionLocal()
+

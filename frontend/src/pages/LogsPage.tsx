@@ -34,12 +34,12 @@ const LogRow = memo(function LogRow({
   formatTime,
   formatFullDate,
 }: LogRowProps) {
-  const textMain = isDarkTheme ? "text-[#e6e6e6]" : "text-gray-900";
-  const textMuted = isDarkTheme ? "text-[#888888]" : "text-gray-500";
-  const hoverBg = isDarkTheme ? "hover:bg-[#2a2a2a]" : "hover:bg-gray-50";
-  const borderColor = isDarkTheme ? "border-[#30363d]" : "border-gray-200";
-  const sourceBadgeBg = isDarkTheme ? "bg-[#2a2a2a] border-[#30363d] text-gray-400" : "bg-gray-100 border-gray-300 text-gray-600";
-  const detailBg = isDarkTheme ? "bg-[#0f0f10]" : "bg-gray-50";
+  const textMain = isDarkTheme ? "text-white" : "text-gray-900";
+  const textMuted = isDarkTheme ? "text-gray-500" : "text-gray-500";
+  const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
+  const borderColor = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const sourceBadgeBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d] text-gray-400" : "bg-gray-100 border-gray-300 text-gray-600";
+  const detailBg = isDarkTheme ? "bg-[#161616]" : "bg-gray-50";
 
   return (
     <>
@@ -216,7 +216,7 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
   const handleDeleteOldLogs = async () => {
     setIsDeleting(true);
     try {
-      const result = await deleteOldLogs(30);
+      const result = await deleteOldLogs(1); // Delete logs older than 1 day for testing
       alert(`Удалено ${result.deleted_count} записей`);
       refetchLogs();
     } catch (error) {
@@ -248,13 +248,13 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const bgColor = isDarkTheme ? "bg-[#0f0f10]" : "bg-gray-50";
-  const cardBg = isDarkTheme ? "bg-[#1e1e1e] border-[#30363d]" : "bg-white border-gray-200";
-  const inputBg = isDarkTheme ? "bg-[#0f0f10] border-[#30363d]" : "bg-white border-gray-300";
-  const textMain = isDarkTheme ? "text-[#e6e6e6]" : "text-gray-900";
-  const textMuted = isDarkTheme ? "text-[#888888]" : "text-gray-500";
-  const textDim = isDarkTheme ? "text-[#444444]" : "text-gray-400";
-  const hoverBg = isDarkTheme ? "hover:bg-[#2a2a2a]" : "hover:bg-gray-50";
+  const bgColor = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const inputBg = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d]" : "bg-white border-gray-300";
+  const textMain = isDarkTheme ? "text-white" : "text-gray-900";
+  const textMuted = isDarkTheme ? "text-gray-500" : "text-gray-500";
+  const textDim = isDarkTheme ? "text-[#6e7681]" : "text-gray-400";
+  const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
 
   return (
     <div className={`min-h-screen ${bgColor} ${textMain}`}>
@@ -486,7 +486,7 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
       <ConfirmModal
         isOpen={showDeleteModal}
         title="Удалить старые логи"
-        message="Удалить записи старше 30 дней? Это действие необратимо."
+        message="Удалить записи старше 1 дня? Это действие необратимо."
         confirmText="Удалить"
         cancelText="Отмена"
         onConfirm={handleDeleteOldLogs}
