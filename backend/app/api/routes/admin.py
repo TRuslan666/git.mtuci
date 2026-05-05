@@ -1,15 +1,15 @@
 import os
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
 import httpx
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -17,8 +17,10 @@ from app.core.security import get_current_user
 from app.core.permissions import require_permission
 from app.models.repository import Repository, RepositoryType
 from app.models.activity_log import ActivityLog, ActivityType
+from app.models.system_log import SystemLog, LogLevel, LogSource
 from app.models.user import User, UserRole
 from app.schemas.repository import RepositoryRead
+from app.schemas.system_log import LogEntry, LogsResponse, LogsStats
 from app.schemas.user import (
     AdminResetPasswordRequest,
     AdminResetPasswordResponse,
@@ -651,3 +653,255 @@ async def sync_gitea_repositories(
             "updated": updated_count,
             "total": len(gitea_repos),
         }
+
+
+# ============ LOGS ENDPOINTS ============
+
+
+@router.get("/logs", response_model=LogsResponse)
+async def get_logs(
+    level: Optional[LogLevel] = Query(None),
+    source: Optional[LogSource] = Query(None),
+    search: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    sort: str = Query("desc", regex="^(desc|asc)$"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get system logs with filtering and pagination."""
+    _require_admin(current_user)
+
+    # Build query
+    query = select(SystemLog)
+
+    # Apply filters
+    conditions = []
+    if level:
+        conditions.append(SystemLog.level == level)
+    if source:
+        conditions.append(SystemLog.source == source)
+    if date_from:
+        conditions.append(SystemLog.created_at >= date_from)
+    if date_to:
+        conditions.append(SystemLog.created_at <= date_to)
+    if search:
+        search_pattern = f"%{search}%"
+        conditions.append(
+            or_(
+                SystemLog.message.ilike(search_pattern),
+                SystemLog.user_email.ilike(search_pattern),
+                SystemLog.ip_address.ilike(search_pattern),
+            )
+        )
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_query)
+    total = total_result.scalar()
+
+    # Apply sorting
+    if sort == "desc":
+        query = query.order_by(SystemLog.created_at.desc())
+    else:
+        query = query.order_by(SystemLog.created_at.asc())
+
+    # Apply pagination
+    query = query.limit(limit).offset(offset)
+
+    # Execute query
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    return LogsResponse(logs=[LogEntry.model_validate(log) for log in logs], total=total)
+
+
+@router.get("/logs/stats", response_model=LogsStats)
+async def get_logs_stats(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get logs statistics."""
+    _require_admin(current_user)
+
+    # Total logs
+    total_result = await session.execute(select(func.count()).select_from(SystemLog))
+    total = total_result.scalar() or 0
+
+    # Today's date range
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+
+    # Errors today
+    errors_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.level == LogLevel.ERROR,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    errors_today = errors_result.scalar() or 0
+
+    # Warnings today
+    warnings_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.level == LogLevel.WARNING,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    warnings_today = warnings_result.scalar() or 0
+
+    # Success today (2xx HTTP status)
+    success_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.http_status >= 200,
+                SystemLog.http_status < 300,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    success_today = success_result.scalar() or 0
+
+    return LogsStats(
+        total=total,
+        errors_today=errors_today,
+        warnings_today=warnings_today,
+        success_today=success_today,
+    )
+
+
+@router.get("/logs/export")
+async def export_logs(
+    level: Optional[LogLevel] = Query(None),
+    source: Optional[LogSource] = Query(None),
+    search: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    sort: str = Query("desc", regex="^(desc|asc)$"),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Export logs to CSV."""
+    _require_admin(current_user)
+
+    # Build query (same as get_logs but without pagination)
+    query = select(SystemLog)
+
+    conditions = []
+    if level:
+        conditions.append(SystemLog.level == level)
+    if source:
+        conditions.append(SystemLog.source == source)
+    if date_from:
+        conditions.append(SystemLog.created_at >= date_from)
+    if date_to:
+        conditions.append(SystemLog.created_at <= date_to)
+    if search:
+        search_pattern = f"%{search}%"
+        conditions.append(
+            or_(
+                SystemLog.message.ilike(search_pattern),
+                SystemLog.user_email.ilike(search_pattern),
+                SystemLog.ip_address.ilike(search_pattern),
+            )
+        )
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    # Apply sorting
+    if sort == "desc":
+        query = query.order_by(SystemLog.created_at.desc())
+    else:
+        query = query.order_by(SystemLog.created_at.asc())
+
+    # Execute query
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    # Generate CSV
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "id", "created_at", "level", "source", "user_id", "user_email",
+        "user_full_name", "message", "detail", "ip_address", "http_status"
+    ])
+
+    # Rows
+    for log in logs:
+        writer.writerow([
+            str(log.id),
+            log.created_at.isoformat(),
+            log.level.value,
+            log.source.value,
+            str(log.user_id) if log.user_id else "",
+            log.user_email or "",
+            log.user_full_name or "",
+            log.message,
+            log.detail or "",
+            log.ip_address,
+            str(log.http_status) if log.http_status else "",
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="logs_{datetime.now(timezone.utc).isoformat()}.csv"'
+        }
+    )
+
+
+@router.delete("/logs/old")
+async def delete_old_logs(
+    days: int = Query(30, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete logs older than specified days."""
+    _require_admin(current_user)
+
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Get count before deletion
+    count_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(SystemLog.created_at < cutoff_date)
+    )
+    deleted_count = count_result.scalar() or 0
+
+    # Delete
+    await session.execute(
+        SystemLog.__table__.delete().where(SystemLog.created_at < cutoff_date)
+    )
+
+    await session.commit()
+
+    return {"deleted_count": deleted_count}

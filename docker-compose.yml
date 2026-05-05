@@ -60,7 +60,7 @@ services:
       - GITEA__security__INSTALL_LOCK=true
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=postgres:5432
-      - GITEA__database__NAME=${POSTGRES_DB:-mtuci}
+      - GITEA__database__NAME=${POSTGRES_DB:-mtuci_app}
       - GITEA__database__USER=${POSTGRES_USER:-mtuci}
       - GITEA__database__PASSWD=${POSTGRES_PASSWORD:-mtuci}
       # Админ пользователь
@@ -81,8 +81,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/healthz"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 
   frontend:
     build:

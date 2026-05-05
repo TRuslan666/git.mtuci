@@ -86,7 +86,6 @@ export default function App() {
                   <Route path="/grades" element={<ProfilePage isDarkTheme={isDarkTheme} />} />
                   <Route path="/submissions" element={<CoursesPage />} />
                   <Route path="/students" element={<CoursesPage />} />
-                  <Route path="/logs" element={<LogsPage isDarkTheme={isDarkTheme} />} />
                   <Route path="/settings" element={<ProfilePage isDarkTheme={isDarkTheme} />} />
                   <Route element={<AdminRequired />}>
                     <Route path="/admin" element={<AdminPage isDarkTheme={isDarkTheme} />} />
@@ -96,6 +95,7 @@ export default function App() {
                     <Route path="/admin/activity" element={<ActivityPage isDarkTheme={isDarkTheme} />} />
                     <Route path="/admin/monitoring" element={<MonitoringPage isDarkTheme={isDarkTheme} />} />
                     <Route path="/admin/settings" element={<AdminSettingsPage isDarkTheme={isDarkTheme} />} />
+                    <Route path="/logs" element={<LogsPage isDarkTheme={isDarkTheme} />} />
                   </Route>
                 </Route>
 

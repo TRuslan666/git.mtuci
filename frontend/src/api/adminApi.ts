@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo, TodayStats, HotRepoStat, TopUserStat, HourlyActivity } from "./types";
+import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo, TodayStats, HotRepoStat, TopUserStat, HourlyActivity, LogsResponse, LogsStats, LogsFilters, LogsPagination } from "./types";
 
 export async function getAdminUsers(): Promise<AdminUserRead[]> {
   return apiRequest<AdminUserRead[]>("/admin/users");
@@ -166,12 +166,70 @@ export async function getRecentActivity(
   const params = new URLSearchParams();
   params.append("limit", String(limit));
   params.append("offset", String(offset));
-  
+
   if (filters?.search) params.append("search", filters.search);
   if (filters?.activityType) params.append("activity_type", filters.activityType);
   if (filters?.userId) params.append("user_id", filters.userId);
   if (filters?.dateFrom && filters.dateFrom !== "undefined") params.append("date_from", filters.dateFrom);
   if (filters?.dateTo && filters.dateTo !== "undefined") params.append("date_to", filters.dateTo);
-  
+
   return apiRequest<RecentActivityResponse>(`/activity/recent?${params.toString()}`);
+}
+
+// Logs API functions
+export async function getLogs(
+  filters?: LogsFilters,
+  pagination?: LogsPagination
+): Promise<LogsResponse> {
+  const params = new URLSearchParams();
+
+  if (filters?.level) params.append("level", filters.level);
+  if (filters?.source) params.append("source", filters.source);
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.date_from) params.append("date_from", filters.date_from);
+  if (filters?.date_to) params.append("date_to", filters.date_to);
+  if (filters?.sort) params.append("sort", filters.sort);
+
+  if (pagination) {
+    params.append("limit", String(pagination.limit));
+    params.append("offset", String(pagination.offset));
+  }
+
+  return apiRequest<LogsResponse>(`/admin/logs?${params.toString()}`);
+}
+
+export async function getLogsStats(): Promise<LogsStats> {
+  return apiRequest<LogsStats>("/admin/logs/stats");
+}
+
+export async function exportLogs(
+  filters?: LogsFilters
+): Promise<Blob> {
+  const params = new URLSearchParams();
+
+  if (filters?.level) params.append("level", filters.level);
+  if (filters?.source) params.append("source", filters.source);
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.date_from) params.append("date_from", filters.date_from);
+  if (filters?.date_to) params.append("date_to", filters.date_to);
+  if (filters?.sort) params.append("sort", filters.sort);
+
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${import.meta.env.VITE_API_URL ?? "/api"}/admin/logs/export?${params.toString()}`, {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+
+  return res.blob();
+}
+
+export async function deleteOldLogs(days: number = 30): Promise<{ deleted_count: number }> {
+  return apiRequest<{ deleted_count: number }>(`/admin/logs/old?days=${days}`, {
+    method: "DELETE",
+  });
 }

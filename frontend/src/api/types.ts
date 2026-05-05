@@ -236,3 +236,46 @@ export interface ResetPasswordRequest {
   new_password: string;
 }
 
+// Logs types
+export type LogLevel = "ERROR" | "WARNING" | "INFO" | "DEBUG";
+export type LogSource = "auth" | "repositories" | "webhooks" | "admin" | "gitea" | "permissions" | "courses";
+
+export interface LogEntry {
+  id: string;
+  created_at: string;
+  level: LogLevel;
+  source: LogSource;
+  user_id: string | null;
+  user_email: string | null;
+  user_full_name: string | null;
+  message: string;
+  detail: string | null;
+  ip_address: string;
+  http_status: number | null;
+}
+
+export interface LogsResponse {
+  logs: LogEntry[];
+  total: number;
+}
+
+export interface LogsStats {
+  total: number;
+  errors_today: number;
+  warnings_today: number;
+  success_today: number;
+}
+
+export interface LogsFilters {
+  level?: LogLevel;
+  source?: LogSource;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  sort?: "desc" | "asc";
+}
+
+export interface LogsPagination {
+  limit: number;
+  offset: number;
+}
