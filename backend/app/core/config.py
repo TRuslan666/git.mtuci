@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,17 +13,18 @@ def _build_database_url() -> str:
     Собирает DATABASE_URL из POSTGRES_* переменных.
     Используем asyncpg для SQLAlchemy async.
     """
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD", "postgres")
-    host = os.getenv("POSTGRES_HOST", "localhost")
+    user = os.getenv("POSTGRES_USER", "mtuci")
+    password = os.getenv("POSTGRES_PASSWORD", "mtuci")
+    host = os.getenv("POSTGRES_HOST", "postgres")
     port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "mtuci")
+    db = os.getenv("POSTGRES_DB", "mtuci_app")
     return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
 
 
 class Settings(BaseModel):
     # Database
     DATABASE_URL: str = Field(default_factory=_build_database_url)
+    DATABASE_URL: str = Field(default_factory=lambda: os.getenv("DATABASE_URL") or _build_database_url())
     DB_ECHO: bool = Field(default=False)
 
     # JWT
@@ -49,6 +49,3 @@ class Settings(BaseModel):
 
     # Uploads
     UPLOAD_DIR: str = Field(default_factory=lambda: os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads")))
-
-settings = Settings()
-

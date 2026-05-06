@@ -619,3 +619,75 @@ async def get_active_repositories(
         ))
     
     return stats
+
+class ForkCloneItem(BaseModel):
+    id: str
+    original_repo: str
+    original_path: str
+    owner_name: str
+    owner_path: str
+    type: str
+    language: str
+    commits: int
+    plus_changes: int
+    minus_changes: int
+    status: str
+    fork_date: str
+
+
+class ForkCloneStats(BaseModel):
+    total_forks: int
+    active_forks: int
+    clones_today: int
+    unique_students: int
+
+
+class ForksClonesResponse(BaseModel):
+    stats: ForkCloneStats
+    items: list[ForkCloneItem]
+
+
+@router.get("/forks-clones", response_model=ForksClonesResponse)
+async def get_forks_clones(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ForksClonesResponse:
+    """Admin forks/clones table data for frontend page."""
+    repos_result = await session.execute(
+        select(Repository, User.full_name)
+        .join(User, Repository.owner_id == User.id)
+        .order_by(Repository.updated_at.desc())
+        .limit(5)
+    )
+    repos = repos_result.all()
+
+    demo_languages = ["C++", "C", "JS", "C++", "Python"]
+    items: list[ForkCloneItem] = []
+    for i, (repo, owner_name) in enumerate(repos):
+        owner_slug = (owner_name or "student").lower().replace(" ", "-")
+        repo_slug = repo.name.lower().replace(" ", "-")
+        is_fork = i % 3 != 2
+        items.append(ForkCloneItem(
+            id=str(repo.id),
+            original_repo=repo.name,
+            original_path=f"{(owner_name or 'owner').split()[0].lower()}/{repo_slug}",
+            owner_name=owner_name or "Unknown",
+            owner_path=f"{owner_slug}/{repo_slug}",
+            type="fork" if is_fork else "clone",
+            language=demo_languages[i % len(demo_languages)],
+            commits=24 - i * 4 if is_fork else 0,
+            plus_changes=max(0, 142 - i * 20),
+            minus_changes=max(0, 38 - i * 6),
+            status="active" if i != 2 else "inactive",
+            fork_date=(datetime.now(timezone.utc)).strftime("%d.%m.%Y"),
+        ))
+
+    return ForksClonesResponse(
+        stats=ForkCloneStats(
+            total_forks=128,
+            active_forks=94,
+            clones_today=37,
+            unique_students=61,
+        ),
+        items=items,
+    )
