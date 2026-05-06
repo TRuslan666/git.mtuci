@@ -38,17 +38,19 @@ const LogRow = memo(function LogRow({
   const textMuted = isDarkTheme ? "text-gray-500" : "text-gray-500";
   const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
   const borderColor = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
-  const sourceBadgeBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d] text-gray-400" : "bg-gray-100 border-gray-300 text-gray-600";
+  const sourceBadgeBg = isDarkTheme ? "bg-gray-500/20 border-gray-500/30 text-gray-300" : "bg-gray-200 border-gray-300 text-gray-600";
   const detailBg = isDarkTheme ? "bg-[#161616]" : "bg-gray-50";
+
+  const isClickable = log.level === "ERROR" || log.level === "WARNING" || log.detail;
 
   return (
     <>
       <tr
-        className={`border-b ${borderColor} cursor-pointer ${hoverBg} transition-colors`}
-        onClick={() => log.detail && onToggle(log.id)}
+        className={`border-b ${borderColor} ${isClickable ? "cursor-pointer" : ""} ${hoverBg} transition-colors`}
+        onClick={() => isClickable && onToggle(log.id)}
         title={formatFullDate(log.created_at)}
       >
-        <td className={`px-3 py-2.5 text-xs font-mono ${textMuted}`}>{formatTime(log.created_at)}</td>
+        <td className={`px-3 py-2.5 text-xs font-mono ${textMain}`}>{formatTime(log.created_at)}</td>
         <td className="px-3 py-2.5">{getLevelBadge(log.level)}</td>
         <td className="px-3 py-2.5">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${sourceBadgeBg}`}>
@@ -67,11 +69,11 @@ const LogRow = memo(function LogRow({
         <td className={`px-3 py-2.5 text-xs font-mono ${textMuted}`}>{log.ip_address}</td>
         <td className="px-3 py-2.5">{getStatusBadge(log.http_status)}</td>
       </tr>
-      {log.detail && isExpanded && (
+      {isClickable && isExpanded && (
         <tr className={`border-b ${borderColor}`}>
           <td colSpan={7} className="p-0">
             <div className={`p-2 font-mono text-xs ${textMuted} whitespace-pre-wrap ${detailBg}`}>
-              {log.detail}
+              {log.detail || `source: ${log.source}\nevent: ${log.message}\nuser: ${log.user_email || "anonymous"}\nip: ${log.ip_address}\nstatus: ${log.http_status || "N/A"}`}
             </div>
           </td>
         </tr>
@@ -125,31 +127,32 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
 
   const getLevelBadge = (level: string) => {
     const styles = {
-      ERROR: "bg-red-500/12 text-red-500 border-red-500/30",
-      WARNING: "bg-amber-500/12 text-amber-500 border-amber-500/30",
-      INFO: "bg-green-500/12 text-green-500 border-green-500/30",
-      DEBUG: "bg-blue-500/12 text-blue-500 border-blue-500/30",
+      ERROR: "bg-red-500/20 text-red-400 border-red-500/30",
+      WARN: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      INFO: "bg-green-500/20 text-green-400 border-green-500/30",
+      DEBUG: "bg-blue-500/20 text-blue-400 border-blue-500/30",
     };
     const dotColors = {
       ERROR: "bg-red-500",
-      WARNING: "bg-amber-500",
+      WARN: "bg-amber-500",
       INFO: "bg-green-500",
       DEBUG: "bg-blue-500",
     };
+    const displayLevel = level === "WARNING" ? "WARN" : level;
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium border ${styles[level as keyof typeof styles]}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[level as keyof typeof dotColors]}`}></span>
-        {level}
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium border ${styles[displayLevel as keyof typeof styles]}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[displayLevel as keyof typeof dotColors]}`}></span>
+        {displayLevel}
       </span>
     );
   };
 
   const getStatusBadge = (status: number | null) => {
-    if (!status) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/12 text-gray-400 border border-gray-500/30">—</span>;
-    if (status >= 500) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/12 text-red-500 border border-red-500/30">{status}</span>;
-    if (status >= 400) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/12 text-amber-500 border border-amber-500/30">{status}</span>;
-    if (status >= 200) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/12 text-green-500 border border-green-500/30">{status}</span>;
-    return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/12 text-gray-400 border border-gray-500/30">{status}</span>;
+    if (!status) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">—</span>;
+    if (status >= 500) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">{status}</span>;
+    if (status >= 400) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">{status}</span>;
+    if (status >= 200) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">{status}</span>;
+    return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">{status}</span>;
   };
 
   const getUserInitials = (log: LogEntry) => {
@@ -235,19 +238,6 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
 
   const totalPages = Math.ceil(total / limit);
 
-  // Keyboard shortcut for search (Cmd/Ctrl + K)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   const bgColor = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
   const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
   const inputBg = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d]" : "bg-white border-gray-300";
@@ -320,7 +310,6 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
               onChange={(e) => setSearch(e.target.value)}
               className={`bg-transparent border-none outline-none text-xs flex-1 ${textMain} placeholder-gray-500`}
             />
-            <span className={`text-[9px] ${textDim} border ${isDarkTheme ? "border-[#30363d]" : "border-gray-300"} rounded px-1.5 py-0.5`}>⌘K</span>
           </div>
           <div className={`w-px h-5 ${isDarkTheme ? "bg-[#30363d]" : "bg-gray-300"}`}></div>
           <select
@@ -330,7 +319,7 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
           >
             <option value="">Все уровни</option>
             <option value="ERROR">ERROR</option>
-            <option value="WARNING">WARNING</option>
+            <option value="WARNING">WARN</option>
             <option value="INFO">INFO</option>
             <option value="DEBUG">DEBUG</option>
           </select>
@@ -419,46 +408,28 @@ export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
               </table>
 
               {/* Pagination */}
-              <div className={`flex items-center justify-between px-3 py-2.5 border-t ${isDarkTheme ? "border-[#30363d]" : "border-gray-200"} text-xs ${textMuted}`}>
+              <div className={`flex items-center justify-between px-4 py-3 border-t ${isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200"} text-sm ${textMuted}`}>
                 <span>Показано {logs.length} из {total}</span>
-                <div className="flex gap-0.5">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className={`w-6 h-6 flex items-center justify-center rounded border ${isDarkTheme ? "border-[#30363d]" : "border-gray-300"} ${hoverBg} transition-colors disabled:opacity-40`}
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                  </button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setPage(pageNum)}
-                        className={`w-6 h-6 flex items-center justify-center rounded border ${page === pageNum ? "bg-blue-600 text-white border-transparent" : `${isDarkTheme ? "border-[#30363d]" : "border-gray-300"} ${hoverBg}`} transition-colors`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  {totalPages > 5 && (
-                    <>
-                      <span className="px-1 text-gray-500">...</span>
-                      <button
-                        onClick={() => setPage(totalPages)}
-                        className={`w-6 h-6 flex items-center justify-center rounded border ${isDarkTheme ? "border-[#30363d]" : "border-gray-300"} ${hoverBg} transition-colors`}
-                      >
-                        {totalPages}
-                      </button>
-                    </>
+                <div className="flex items-center gap-2">
+                  {page > 1 && (
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${isDarkTheme ? "bg-[#161616] border-[#30363d] text-[#8b949e] hover:bg-[#1f2937] hover:text-[#ccd0d4]" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                    >
+                      ←
+                    </button>
                   )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className={`w-6 h-6 flex items-center justify-center rounded border ${isDarkTheme ? "border-[#30363d]" : "border-gray-300"} ${hoverBg} transition-colors disabled:opacity-40`}
-                  >
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
+                  <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg">
+                    {page}
+                  </span>
+                  {page < totalPages && (
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${isDarkTheme ? "bg-[#161616] border-[#30363d] text-[#8b949e] hover:bg-[#1f2937] hover:text-[#ccd0d4]" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                    >
+                      →
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span>По</span>

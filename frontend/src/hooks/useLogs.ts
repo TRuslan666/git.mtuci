@@ -30,21 +30,33 @@ export function useLogsFilters() {
   );
   const [sort, setSort] = useState<"desc" | "asc">(() => (searchParams.get("sort") as any) || "desc");
 
+  // Memoize date_from based on timeFilter to avoid constant recalculations
+  const dateFrom = useMemo(() => {
+    if (timeFilter === "today") return null;
+    
+    const now = new Date();
+    switch (timeFilter) {
+      case "hour":
+        return new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      case "week":
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      case "month":
+        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      default:
+        return null;
+    }
+  }, [timeFilter]);
+
   // Update URL when filters change
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams();
     if (level) params.set("level", level);
-    else params.delete("level");
     if (source) params.set("source", source);
-    else params.delete("source");
     if (search) params.set("search", search);
-    else params.delete("search");
     if (timeFilter) params.set("time", timeFilter);
-    else params.delete("time");
     if (sort) params.set("sort", sort);
-    else params.delete("sort");
     setSearchParams(params, { replace: true });
-  }, [level, source, search, timeFilter, sort, searchParams, setSearchParams]);
+  }, [level, source, search, timeFilter, sort, setSearchParams]);
 
   const getFilters = useCallback((): LogsFilters => {
     const filters: LogsFilters = {
@@ -54,32 +66,10 @@ export function useLogsFilters() {
     if (level) filters.level = level;
     if (source) filters.source = source;
     if (search) filters.search = search;
-
-    // Convert time filter to date range
-    const now = new Date();
-    let dateFrom: Date | null = null;
-
-    switch (timeFilter) {
-      case "hour":
-        dateFrom = new Date(now.getTime() - 60 * 60 * 1000);
-        break;
-      case "today":
-        dateFrom = new Date(now.setHours(0, 0, 0, 0));
-        break;
-      case "week":
-        dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "month":
-        dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-    }
-
-    if (dateFrom) {
-      filters.date_from = dateFrom.toISOString();
-    }
+    if (dateFrom) filters.date_from = dateFrom;
 
     return filters;
-  }, [level, source, search, timeFilter, sort]);
+  }, [level, source, search, dateFrom, sort]);
 
   const resetFilters = useCallback(() => {
     setLevel("");
