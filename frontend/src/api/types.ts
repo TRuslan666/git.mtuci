@@ -15,6 +15,7 @@ export interface UserRead {
   is_blocked: boolean;
   avatar_url: string | null;
   avatar_display_mode: "cover" | "contain" | "fill" | "scale-down";
+  allow_assistant_grading: boolean;
   created_at: string;
   last_login: string | null;
 }

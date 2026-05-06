@@ -48,6 +48,7 @@ class User(Base):
     
     is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # Ожидает апрува админа
+    allow_assistant_grading: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # Разрешить лаборантам проверять работы
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_display_mode: Mapped[AvatarDisplayMode] = mapped_column(
         SAEnum(AvatarDisplayMode, name="avatar_display_mode"),

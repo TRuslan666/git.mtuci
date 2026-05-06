@@ -20,6 +20,7 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.schemas.user import UserRead
+from pydantic import BaseModel
 from app.services.password_reset_service import request_password_reset, reset_password_by_token
 from app.services.mtuci_service import fetch_student_info, MTUCIAuthError, MTUCIServiceError
 from app.services.user_service import get_next_student_id
@@ -272,6 +273,30 @@ async def login(
 @router.get("/me", response_model=UserRead)
 async def me(current_user=Depends(get_current_user)):
     return UserRead.model_validate(current_user)
+
+
+class UpdateAssistantGradingRequest(BaseModel):
+    allow_assistant_grading: bool
+
+
+@router.patch("/me/assistant-grading")
+async def update_assistant_grading(
+    payload: UpdateAssistantGradingRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update allow_assistant_grading setting for current user (teacher only)."""
+    if current_user.role != UserRole.teacher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teachers can update this setting"
+        )
+    
+    current_user.allow_assistant_grading = payload.allow_assistant_grading
+    await session.commit()
+    await session.refresh(current_user)
+    
+    return {"allow_assistant_grading": current_user.allow_assistant_grading}
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

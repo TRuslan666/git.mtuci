@@ -31,6 +31,7 @@ import {
   type Laborant,
   type AuditLog
 } from "../api/rolesApi";
+import { getMe, updateAssistantGrading } from "../api/authApi";
 import toast from "react-hot-toast";
 import AdminPageHeader from "../components/AdminPageHeader";
 
@@ -176,13 +177,19 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
       // Reset assistants immediately to avoid showing old data
       setAssistants([]);
       try {
-        const [permsData, laborantsData] = await Promise.all([
+        const [permsData, laborantsData, meData] = await Promise.all([
           getRolePermissions(selectedRole),
           selectedRole === "teacher" ? getLaborants() : Promise.resolve([]),
+          selectedRole === "teacher" ? getMe() : Promise.resolve(null),
         ]);
         
         console.log("Loaded permissions for", selectedRole, permsData);
         console.log("Loaded laborants:", laborantsData);
+        
+        // Load allow_assistant_grading from user data
+        if (meData && meData.allow_assistant_grading !== undefined) {
+          setAllowAssistantGrading(meData.allow_assistant_grading);
+        }
         
         // Map API categories to component format with icons
         const mappedCategories: PermissionCategoryState[] = permsData.map((cat) => {
@@ -566,7 +573,17 @@ export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
                         </div>
                         <Toggle
                           checked={allowAssistantGrading}
-                          onChange={() => setAllowAssistantGrading(!allowAssistantGrading)}
+                          onChange={async () => {
+                            const newValue = !allowAssistantGrading;
+                            setAllowAssistantGrading(newValue);
+                            try {
+                              await updateAssistantGrading(newValue);
+                              toast.success(newValue ? "Лаборантам разрешена проверка" : "Лаборантам запрещена проверка");
+                            } catch (error) {
+                              toast.error("Ошибка при сохранении настройки");
+                              setAllowAssistantGrading(!newValue); // Revert on error
+                            }
+                          }}
                           isDarkTheme={isDarkTheme}
                         />
                       </div>

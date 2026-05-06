@@ -19,6 +19,7 @@ class UserRead(BaseModel):
     group_name: str | None = None
     student_id: str | None = None
     avatar_url: str | None = None
+    allow_assistant_grading: bool = False
     avatar_display_mode: str = "cover"
     created_at: datetime
     last_login: datetime | None = None
