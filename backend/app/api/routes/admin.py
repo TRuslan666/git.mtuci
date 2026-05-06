@@ -1,21 +1,27 @@
-from __future__ import annotations
-
 import os
 import secrets
 import string
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 from uuid import UUID
 
 import httpx
 import psutil
-from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.security import get_current_user
+from app.core.permissions import require_permission
+from app.models.repository import Repository, RepositoryType
+from app.models.activity_log import ActivityLog, ActivityType
+from app.models.system_log import SystemLog, LogLevel, LogSource
 from app.models.user import User, UserRole
+from app.schemas.repository import RepositoryRead
+from app.schemas.system_log import LogEntry, LogsResponse, LogsStats
 from app.schemas.user import (
     AdminResetPasswordRequest,
     AdminResetPasswordResponse,
@@ -28,6 +34,7 @@ from app.services.user_service import (
     reset_user_password,
     update_user_role_and_block,
 )
+from app.services.logging_service import log_event_background
 
 
 class SystemMetrics(BaseModel):
@@ -53,9 +60,29 @@ class BackupInfo(BaseModel):
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request, handling proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _require_admin(current_user: User) -> None:
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+
+
+def _check_not_self(current_user: User, target_user_id: UUID) -> None:
+    """Prevent admin from modifying themselves."""
+    if current_user.id == target_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot perform this action on yourself")
+
+
+def _check_target_not_admin(target_user: User) -> None:
+    """Prevent actions on other admin users."""
+    if target_user.role == UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot perform this action on admin users")
 
 
 def _generate_password(length: int = 12) -> str:
@@ -64,23 +91,32 @@ def _generate_password(length: int = 12) -> str:
 
 
 @router.get("/users", response_model=list[AdminUserRead])
+@require_permission("user_view")
 async def admin_get_users(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> list[AdminUserRead]:
-    _require_admin(current_user)
+) -> List[AdminUserRead]:
     users = await get_all_users(session)
     return [AdminUserRead.model_validate(u) for u in users]
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserRead)
+@require_permission("user_edit")
 async def admin_patch_user(
     user_id: UUID,
     payload: AdminUpdateUserRequest,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
-    _require_admin(current_user)
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
+
     user = await update_user_role_and_block(
         session,
         user_id=user_id,
@@ -94,49 +130,96 @@ async def admin_patch_user(
 
 
 @router.post("/users/{user_id}/approve", response_model=AdminUserRead)
+@require_permission("user_edit")
 async def admin_approve_user(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserRead:
-    """Approve pending user (admin only)."""
-    _require_admin(current_user)
-    
+    """Approve pending user."""
+    ip_address = get_client_ip(request)
+    _check_not_self(current_user, user_id)
+
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
+    _check_target_not_admin(user)
+
     user.is_pending = False
     await session.commit()
     await session.refresh(user)
+
+    # Log approval
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.admin,
+        message=f"Approved user: {user.email}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=200,
+    ))
+
     return AdminUserRead.model_validate(user)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("user_delete")
 async def admin_delete_user(
     user_id: UUID,
-    current_user=Depends(get_current_user),
+    request: Request,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    _require_admin(current_user)
-    try:
-        await delete_user_by_id(session, user_id)
-    except ValueError:
+    ip_address = get_client_ip(request)
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
+
+    user_email = target_user.email
+
+    await delete_user_by_id(session, user_id)
+
+    # Log deletion
+    asyncio.create_task(log_event_background(
+        level=LogLevel.INFO,
+        source=LogSource.admin,
+        message=f"Deleted user: {user_email}",
+        ip_address=ip_address,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        user_full_name=current_user.full_name,
+        http_status=204,
+    ))
 
     # Важно: явно возвращаем Response, чтобы FastAPI не пытался сериализовать body.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/users/{user_id}/reset-password", response_model=AdminResetPasswordResponse)
+@require_permission("user_edit")
 async def admin_reset_password(
     user_id: UUID,
-    payload: AdminResetPasswordRequest | None = Body(None),
-    current_user=Depends(get_current_user),
+    payload: Optional[AdminResetPasswordRequest] = None,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AdminResetPasswordResponse:
-    _require_admin(current_user)
+    _check_not_self(current_user, user_id)
+
+    # Fetch target user and check if admin
+    result = await session.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _check_target_not_admin(target_user)
 
     if payload and payload.new_password:
         new_password = payload.new_password
@@ -148,10 +231,11 @@ async def admin_reset_password(
 
 
 @router.get("/system-metrics", response_model=SystemMetrics)
+@require_permission("settings_view")
 async def admin_system_metrics(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> SystemMetrics:
-    _require_admin(current_user)
 
     # CPU
     cpu_percent = psutil.cpu_percent(interval=1)
@@ -180,10 +264,11 @@ async def admin_system_metrics(
 
 
 @router.get("/service-status", response_model=ServiceStatus)
+@require_permission("settings_view")
 async def admin_service_status(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ServiceStatus:
-    _require_admin(current_user)
 
     # Check Git service (Gitea)
     git_status = False
@@ -206,10 +291,11 @@ async def admin_service_status(
 
 
 @router.get("/backups", response_model=BackupInfo)
+@require_permission("logs_view")
 async def admin_backups(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> BackupInfo:
-    _require_admin(current_user)
 
     # Check for backup files in /backups directory
     backup_dir = "/backups"
@@ -239,10 +325,11 @@ async def admin_backups(
 
 
 @router.post("/backups/create")
+@require_permission("settings_edit")
 async def admin_create_backup(
     current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
-    _require_admin(current_user)
 
     import subprocess
     from datetime import datetime
@@ -291,3 +378,578 @@ async def admin_create_backup(
         raise HTTPException(status_code=500, detail="Backup timeout")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup error: {str(e)}")
+
+
+@router.get("/repositories", response_model=List[RepositoryRead])
+@require_permission("repo_view")
+async def admin_list_repositories(
+    repo_type: Optional[RepositoryType] = None,
+    language: Optional[str] = None,
+    is_blocked: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> List[RepositoryRead]:
+    """Get all repositories with optional filters and pagination (admin only)."""
+    query = select(Repository, User.full_name.label("owner_name")).outerjoin(
+        User, Repository.owner_id == User.id
+    )
+
+    if repo_type:
+        query = query.where(Repository.repo_type == repo_type)
+    if language:
+        query = query.where(Repository.language == language)
+    if is_blocked is not None:
+        query = query.where(Repository.is_blocked == is_blocked)
+
+    query = query.order_by(Repository.created_at.desc()).offset(skip).limit(limit)
+
+    result = await session.execute(query)
+    repos_with_owners = result.all()
+
+    repositories = []
+    for repo, owner_name in repos_with_owners:
+        # Count commits from activity_log
+        commits_result = await session.execute(
+            select(func.count(ActivityLog.id)).where(
+                ActivityLog.repo_name == repo.gitea_repo_name,
+                ActivityLog.activity_type == ActivityType.commit
+            )
+        )
+        commits_count = commits_result.scalar() or 0
+
+        repo_dict = {
+            "id": repo.id,
+            "name": repo.name,
+            "description": repo.description,
+            "gitea_repo_name": repo.gitea_repo_name,
+            "clone_url": repo.clone_url,
+            "owner_id": repo.owner_id,
+            "owner_full_name": owner_name or repo.gitea_repo_name or "Unknown",
+            "commits_count": commits_count,
+            "is_public": repo.repo_type == RepositoryType.public,
+            "repo_type": repo.repo_type,
+            "language": repo.language,
+            "is_blocked": repo.is_blocked,
+            "created_at": repo.created_at,
+            "updated_at": repo.updated_at,
+        }
+        repositories.append(RepositoryRead.model_validate(repo_dict))
+
+    return repositories
+
+
+@router.post("/repositories/{repository_id}/toggle-block", response_model=RepositoryRead)
+@require_permission("repo_edit")
+async def admin_toggle_repository_block(
+    repository_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RepositoryRead:
+    """Toggle repository blocked status (admin only)."""
+    result = await session.execute(
+        select(Repository).where(Repository.id == repository_id)
+    )
+    repository = result.scalar_one_or_none()
+    if not repository:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    repository.is_blocked = not repository.is_blocked
+    await session.commit()
+    await session.refresh(repository)
+    return RepositoryRead.model_validate(repository)
+
+
+# System-wide Gitea webhook setup
+GITEA_URL = os.getenv("GITEA_URL", "http://gitea:3000")
+GITEA_TOKEN = os.getenv("GITEA_TOKEN", "")
+WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "http://api:8000/webhooks")
+WEBHOOK_SECRET = os.getenv("GITEA_WEBHOOK_SECRET", "")
+
+
+@router.post("/setup-gitea-webhook")
+async def setup_gitea_system_webhook(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Create system-wide webhook in Gitea to capture all events from all repositories.
+    This needs to be called once after Gitea is set up.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"GITEA_TOKEN configured: {bool(GITEA_TOKEN)}, length: {len(GITEA_TOKEN) if GITEA_TOKEN else 0}")
+    logger.info(f"GITEA_URL: {GITEA_URL}")
+    
+    if not GITEA_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GITEA_TOKEN not configured",
+        )
+    
+    async with httpx.AsyncClient() as client:
+        # Check if system webhook already exists
+        hooks_response = await client.get(
+            f"{GITEA_URL}/api/v1/admin/hooks",
+            headers={"Authorization": f"token {GITEA_TOKEN}"},
+            timeout=10.0,
+        )
+        
+        if hooks_response.status_code == 200:
+            hooks = hooks_response.json()
+            for hook in hooks:
+                config = hook.get("config", {})
+                if config.get("url") == f"{WEBHOOK_BASE_URL}/gitea":
+                    return {
+                        "status": "already_exists",
+                        "message": "System webhook already configured",
+                        "hook_id": hook.get("id"),
+                    }
+        
+        # Create system webhook for all events
+        logger.info(f"Creating system webhook -> {WEBHOOK_BASE_URL}/gitea")
+        
+        # Gitea system webhook API
+        response = await client.post(
+            f"{GITEA_URL}/api/v1/admin/hooks",
+            headers={
+                "Authorization": f"token {GITEA_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "type": "gitea",
+                "config": {
+                    "url": f"{WEBHOOK_BASE_URL}/gitea",
+                    "content_type": "json",
+                    "secret": WEBHOOK_SECRET,
+                },
+                "events": [
+                    "push",
+                    "create",
+                    "delete",
+                    "fork",
+                    "repository",
+                    "release",
+                ],
+                "active": True,
+            },
+            timeout=10.0,
+        )
+        
+        if response.status_code in (201, 200):
+            hook_data = response.json()
+            logger.info(f"System webhook created successfully: {hook_data.get('id')}")
+            return {
+                "status": "created",
+                "message": "System webhook created successfully",
+                "hook_id": hook_data.get("id"),
+                "events": ["push", "create", "delete", "fork", "repository", "release"],
+            }
+        else:
+            error_text = response.text[:500]
+            logger.error(f"Failed to create system webhook: {response.status_code} - {error_text}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create system webhook: {response.status_code} - {error_text}",
+            )
+
+
+@router.post("/sync-gitea-repositories")
+async def sync_gitea_repositories(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Sync all repositories from Gitea to local database.
+    This is useful for initial sync or after webhook setup.
+    """
+    import logging
+    from app.models.repository import Repository, RepositoryType
+    from app.core.config import settings
+
+    logger = logging.getLogger(__name__)
+
+    async with httpx.AsyncClient() as client:
+        # Get all repositories from Gitea (using user repos endpoint with admin token)
+        response = await client.get(
+            f"{settings.GITEA_URL}/api/v1/user/repos",
+            headers={"Authorization": f"token {settings.GITEA_TOKEN}"},
+            timeout=30.0,
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Failed to fetch repositories from Gitea: {response.status_code}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch repositories from Gitea: {response.status_code}",
+            )
+
+        gitea_repos = response.json()
+        synced_count = 0
+        updated_count = 0
+
+        for gitea_repo in gitea_repos:
+            gitea_repo_id = gitea_repo.get("id")
+            full_name = gitea_repo.get("full_name")
+            description = gitea_repo.get("description")
+            clone_url = gitea_repo.get("clone_url")
+            is_private = gitea_repo.get("private", False)
+            language = gitea_repo.get("language")
+            owner_login = gitea_repo.get("owner", {}).get("login")
+
+            # Find user by login
+            user_id = None
+            if owner_login:
+                result = await session.execute(
+                    select(User.id).where(User.mtuci_login == owner_login)
+                )
+                user_id = result.scalar_one_or_none()
+
+            # Check if repo already exists
+            existing = await session.execute(
+                select(Repository).where(Repository.gitea_repo_id == gitea_repo_id)
+            )
+            repo = existing.scalar_one_or_none()
+
+            if repo:
+                # Update existing repo
+                repo.description = description
+                repo.clone_url = clone_url
+                repo.language = language
+                if user_id:
+                    repo.owner_id = user_id
+                updated_count += 1
+            else:
+                # Create new repo
+                new_repo = Repository(
+                    name=full_name.split("/")[-1] if "/" in full_name else full_name,
+                    description=description,
+                    gitea_repo_name=full_name,
+                    gitea_repo_id=gitea_repo_id,
+                    clone_url=clone_url,
+                    owner_id=user_id,
+                    repo_type=RepositoryType.private if is_private else RepositoryType.public,
+                    language=language,
+                )
+                session.add(new_repo)
+                synced_count += 1
+
+            # Sync commits for this repo
+            try:
+                commits_response = await client.get(
+                    f"{settings.GITEA_URL}/api/v1/repos/{full_name}/commits",
+                    headers={"Authorization": f"token {settings.GITEA_TOKEN}"},
+                    timeout=30.0,
+                )
+                if commits_response.status_code == 200:
+                    commits = commits_response.json()
+                    from app.models.activity_log import ActivityLog, ActivityType
+                    from datetime import datetime, timezone
+
+                    for commit in commits:
+                        # Check if commit already logged
+                        commit_sha = commit.get("sha")
+                        existing_commit = await session.execute(
+                            select(ActivityLog).where(
+                                ActivityLog.repo_name == full_name,
+                                ActivityLog.message.like(f"%{commit_sha[:7]}%")
+                            )
+                        )
+                        if not existing_commit.scalar_one_or_none():
+                            # Log commit
+                            commit_author = commit.get("commit", {}).get("author", {}).get("name")
+                            commit_message = commit.get("commit", {}).get("message", "")
+                            commit_date_str = commit.get("commit", {}).get("author", {}).get("date")
+
+                            # Try to find user by author name
+                            commit_user_id = user_id
+                            if not commit_user_id and commit_author:
+                                result = await session.execute(
+                                    select(User.id).where(User.full_name.ilike(f"%{commit_author}%"))
+                                )
+                                commit_user_id = result.scalar_one_or_none()
+
+                            activity = ActivityLog(
+                                user_id=commit_user_id,
+                                user_login=owner_login if not commit_user_id else None,
+                                activity_type=ActivityType.commit,
+                                repo_name=full_name,
+                                message=f"{commit_message[:100]} ({commit_sha[:7]})",
+                                created_at=datetime.fromisoformat(commit_date_str.replace("Z", "+00:00")) if commit_date_str else datetime.now(timezone.utc),
+                            )
+                            session.add(activity)
+            except Exception as e:
+                logger.warning(f"Failed to sync commits for {full_name}: {e}")
+
+        await session.commit()
+        logger.info(f"Synced {synced_count} new repos, updated {updated_count} existing repos from Gitea")
+
+        return {
+            "status": "ok",
+            "synced": synced_count,
+            "updated": updated_count,
+            "total": len(gitea_repos),
+        }
+
+
+# ============ LOGS ENDPOINTS ============
+
+
+@router.get("/logs", response_model=LogsResponse)
+async def get_logs(
+    level: Optional[LogLevel] = Query(None),
+    source: Optional[LogSource] = Query(None),
+    search: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    sort: str = Query("desc", regex="^(desc|asc)$"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get system logs with filtering and pagination."""
+    _require_admin(current_user)
+
+    # Build query
+    query = select(SystemLog)
+
+    # Apply filters
+    conditions = []
+    if level:
+        conditions.append(SystemLog.level == level)
+    if source:
+        conditions.append(SystemLog.source == source)
+    if date_from:
+        conditions.append(SystemLog.created_at >= date_from)
+    if date_to:
+        conditions.append(SystemLog.created_at <= date_to)
+    if search:
+        search_pattern = f"%{search}%"
+        conditions.append(
+            or_(
+                SystemLog.message.ilike(search_pattern),
+                SystemLog.user_email.ilike(search_pattern),
+                SystemLog.ip_address.ilike(search_pattern),
+            )
+        )
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_query)
+    total = total_result.scalar()
+
+    # Apply sorting
+    if sort == "desc":
+        query = query.order_by(SystemLog.created_at.desc())
+    else:
+        query = query.order_by(SystemLog.created_at.asc())
+
+    # Apply pagination
+    query = query.limit(limit).offset(offset)
+
+    # Execute query
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    return LogsResponse(logs=[LogEntry.model_validate(log) for log in logs], total=total)
+
+
+@router.get("/logs/stats", response_model=LogsStats)
+async def get_logs_stats(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get logs statistics."""
+    _require_admin(current_user)
+
+    # Total logs
+    total_result = await session.execute(select(func.count()).select_from(SystemLog))
+    total = total_result.scalar() or 0
+
+    # Today's date range
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+
+    # Errors today
+    errors_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.level == LogLevel.ERROR,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    errors_today = errors_result.scalar() or 0
+
+    # Warnings today
+    warnings_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.level == LogLevel.WARNING,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    warnings_today = warnings_result.scalar() or 0
+
+    # Success today (2xx HTTP status)
+    success_result = await session.execute(
+        select(func.count())
+        .select_from(SystemLog)
+        .where(
+            and_(
+                SystemLog.http_status >= 200,
+                SystemLog.http_status < 300,
+                SystemLog.created_at >= today_start,
+                SystemLog.created_at < today_end,
+            )
+        )
+    )
+    success_today = success_result.scalar() or 0
+
+    return LogsStats(
+        total=total,
+        errors_today=errors_today,
+        warnings_today=warnings_today,
+        success_today=success_today,
+    )
+
+
+@router.get("/logs/export")
+async def export_logs(
+    level: Optional[LogLevel] = Query(None),
+    source: Optional[LogSource] = Query(None),
+    search: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    sort: str = Query("desc", regex="^(desc|asc)$"),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Export logs to CSV."""
+    _require_admin(current_user)
+
+    # Build query (same as get_logs but without pagination)
+    query = select(SystemLog)
+
+    conditions = []
+    if level:
+        conditions.append(SystemLog.level == level)
+    if source:
+        conditions.append(SystemLog.source == source)
+    if date_from:
+        conditions.append(SystemLog.created_at >= date_from)
+    if date_to:
+        conditions.append(SystemLog.created_at <= date_to)
+    if search:
+        search_pattern = f"%{search}%"
+        conditions.append(
+            or_(
+                SystemLog.message.ilike(search_pattern),
+                SystemLog.user_email.ilike(search_pattern),
+                SystemLog.ip_address.ilike(search_pattern),
+            )
+        )
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    # Apply sorting
+    if sort == "desc":
+        query = query.order_by(SystemLog.created_at.desc())
+    else:
+        query = query.order_by(SystemLog.created_at.asc())
+
+    # Execute query
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    # Generate CSV
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "id", "created_at", "level", "source", "user_id", "user_email",
+        "user_full_name", "message", "detail", "ip_address", "http_status"
+    ])
+
+    # Rows
+    for log in logs:
+        writer.writerow([
+            str(log.id),
+            log.created_at.isoformat(),
+            log.level.value,
+            log.source.value,
+            str(log.user_id) if log.user_id else "",
+            log.user_email or "",
+            log.user_full_name or "",
+            log.message,
+            log.detail or "",
+            log.ip_address,
+            str(log.http_status) if log.http_status else "",
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="logs_{datetime.now(timezone.utc).isoformat()}.csv"'
+        }
+    )
+
+
+@router.delete("/logs/old")
+async def delete_old_logs(
+    days: int = Query(30, ge=0, le=365),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete logs older than specified days. If days=0, delete all logs."""
+    _require_admin(current_user)
+
+    if days == 0:
+        # Delete all logs
+        count_result = await session.execute(select(func.count()).select_from(SystemLog))
+        deleted_count = count_result.scalar() or 0
+        
+        await session.execute(SystemLog.__table__.delete())
+    else:
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Get count before deletion
+        count_result = await session.execute(
+            select(func.count())
+            .select_from(SystemLog)
+            .where(SystemLog.created_at < cutoff_date)
+        )
+        deleted_count = count_result.scalar() or 0
+
+        # Delete
+        await session.execute(
+            SystemLog.__table__.delete().where(SystemLog.created_at < cutoff_date)
+        )
+
+    await session.commit()
+
+    return {"deleted_count": deleted_count}

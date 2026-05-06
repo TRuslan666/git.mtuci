@@ -3,9 +3,10 @@ import { useState, useRef, useEffect } from "react";
 interface AvatarCropperProps {
   imageUrl: string;
   onCropChange?: (crop: { x: number; y: number; zoom: number }) => void;
+  isDarkTheme?: boolean;
 }
 
-export default function AvatarCropper({ imageUrl, onCropChange }: AvatarCropperProps) {
+export default function AvatarCropper({ imageUrl, onCropChange, isDarkTheme = true }: AvatarCropperProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -109,10 +110,16 @@ export default function AvatarCropper({ imageUrl, onCropChange }: AvatarCropperP
     };
   }, [isDragging, dragStart]);
 
+  const containerBg = isDarkTheme ? "bg-[#1e1e1e]" : "bg-slate-100";
+  const sliderBg = isDarkTheme ? "bg-[#30363d]" : "bg-slate-200";
+  const textSecondary = isDarkTheme ? "text-gray-400" : "text-slate-500";
+  const textTertiary = isDarkTheme ? "text-gray-500" : "text-slate-600";
+  const accentColor = isDarkTheme ? "accent-blue-500" : "accent-blue-600";
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Crop Area - now showing full image with circular guide */}
-      <div className="relative h-80 w-80 overflow-hidden rounded-xl bg-gray-100">
+      <div className={`relative h-80 w-80 overflow-hidden rounded-xl ${containerBg}`}>
         {/* Full image container */}
         <div
           ref={containerRef}
@@ -169,7 +176,7 @@ export default function AvatarCropper({ imageUrl, onCropChange }: AvatarCropperP
       {/* Controls */}
       <div className="w-full max-w-xs space-y-3">
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">Масштаб:</span>
+          <span className={`text-xs ${textSecondary}`}>Масштаб:</span>
           <input
             type="range"
             min="0.1"
@@ -177,12 +184,12 @@ export default function AvatarCropper({ imageUrl, onCropChange }: AvatarCropperP
             step="0.05"
             value={zoom}
             onChange={(e) => setZoom(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#372579]"
+            className={`flex-1 h-2 ${sliderBg} rounded-lg appearance-none cursor-pointer ${accentColor}`}
           />
-          <span className="text-xs text-gray-600 w-10">{(zoom * 100).toFixed(0)}%</span>
+          <span className={`text-xs ${textTertiary} w-10`}>{(zoom * 100).toFixed(0)}%</span>
         </div>
         
-        <p className="text-xs text-gray-500 text-center">
+        <p className={`text-xs ${textSecondary} text-center`}>
           Перетаскивайте изображение и меняйте масштаб. Белый круг показывает итоговую аватарку.
         </p>
       </div>

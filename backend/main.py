@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -14,9 +15,14 @@ from app.api.routes.courses import router as courses_router
 from app.api.routes.repositories import router as repositories_router
 from app.api.routes.groups import router as groups_router
 from app.api.routes.stats import router as stats_router
+from app.api.routes.roles import router as roles_router
+from app.api.routes.webhooks import router as webhooks_router
+from app.api.routes.websocket import router as websocket_router
+from app.api.routes.activity import router as activity_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
+from app.core.logging_middleware import LoggingMiddleware
 from app.models.user import User, UserRole
 from app.models.assignment_file import AssignmentFile  # Import BEFORE Assignment
 from app.models.assignment import Assignment
@@ -28,7 +34,25 @@ from app.models.submission import Submission
 from sqlalchemy import select
 
 
-app = FastAPI(title="MTUCI Lab Submission API", version="0.1.0")
+app = FastAPI(
+    title="MTUCI API",
+    description="MTUCI Git Management API",
+    version="1.0.0",
+)
+
+# CORS для работы фронтенда в Docker
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001", "http://frontend:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Add logging middleware for automatic request logging
+app.add_middleware(LoggingMiddleware)
+
+# Original FastAPI init continues belowtitle="MTUCI Lab Submission API", version="0.1.0")
 
 # Mount uploads directory for serving avatar images
 uploads_dir = Path(settings.UPLOAD_DIR)
@@ -42,12 +66,21 @@ app.include_router(courses_router)
 app.include_router(groups_router)
 app.include_router(repositories_router, prefix="/repositories")
 app.include_router(stats_router)
+app.include_router(roles_router)
+app.include_router(webhooks_router)
+app.include_router(websocket_router)
+app.include_router(activity_router)
 
 # Development CORS:
 # Frontend runs on http://localhost:3001 and API on http://localhost:8000.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=[
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,6 +121,7 @@ async def create_super_admin_if_missing() -> None:
                     full_name="Super Admin",
                     role=UserRole.admin,
                     is_blocked=False,
+                    is_pending=False,
                 )
                 session.add(existing)
                 await session.commit()
@@ -96,6 +130,7 @@ async def create_super_admin_if_missing() -> None:
                 # На случай, если пользователь уже существует, гарантируем права супер-админа.
                 existing.role = UserRole.admin
                 existing.is_blocked = False
+                existing.is_pending = False
                 session.add(existing)
                 await session.commit()
     except Exception as e:

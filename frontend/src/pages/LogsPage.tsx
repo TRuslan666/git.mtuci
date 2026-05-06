@@ -1,32 +1,470 @@
-import { FileCode, Clock } from "lucide-react";
+import { useState, useEffect, useRef, memo } from "react";
+import { Search, Download, Trash2, ChevronLeft, ChevronRight, FileX } from "lucide-react";
+import { useLogsFilters, useLogsPagination, useLogsData, useLogsStats, useDebounce } from "../hooks/useLogs";
+import { exportLogs, deleteOldLogs } from "../api/adminApi";
+import ConfirmModal from "../components/ConfirmModal";
+import type { LogEntry } from "../api/types";
 
-export default function LogsPage() {
+interface LogsPageProps {
+  isDarkTheme?: boolean;
+}
+
+interface LogRowProps {
+  log: LogEntry;
+  isExpanded: boolean;
+  onToggle: (id: string) => void;
+  isDarkTheme: boolean;
+  getLevelBadge: (level: string) => React.ReactNode;
+  getStatusBadge: (status: number | null) => React.ReactNode;
+  getUserInitials: (log: LogEntry) => string;
+  getUserName: (log: LogEntry) => string;
+  formatTime: (isoString: string) => string;
+  formatFullDate: (isoString: string) => string;
+}
+
+const LogRow = memo(function LogRow({
+  log,
+  isExpanded,
+  onToggle,
+  isDarkTheme,
+  getLevelBadge,
+  getStatusBadge,
+  getUserInitials,
+  getUserName,
+  formatTime,
+  formatFullDate,
+}: LogRowProps) {
+  const textMain = isDarkTheme ? "text-white" : "text-gray-900";
+  const textMuted = isDarkTheme ? "text-gray-500" : "text-gray-500";
+  const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
+  const borderColor = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const sourceBadgeBg = isDarkTheme ? "bg-gray-500/20 border-gray-500/30 text-gray-300" : "bg-gray-200 border-gray-300 text-gray-600";
+  const detailBg = isDarkTheme ? "bg-[#161616]" : "bg-gray-50";
+
+  const isClickable = log.level === "ERROR" || log.level === "WARNING" || log.detail;
+
   return (
-    <div className="h-full overflow-y-auto bg-[#f5f3fa] dark:bg-[#0f0f10] text-gray-900 dark:text-white transition-colors">
-      <div className="max-w-7xl mx-auto py-6 px-6 pr-2 pb-20">
-        <div className="flex items-center gap-3 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Логи</h1>
-        </div>
+    <>
+      <tr
+        className={`border-b ${borderColor} ${isClickable ? "cursor-pointer" : ""} ${hoverBg} transition-colors`}
+        onClick={() => isClickable && onToggle(log.id)}
+        title={formatFullDate(log.created_at)}
+      >
+        <td className={`px-3 py-2.5 text-xs font-mono ${textMain}`}>{formatTime(log.created_at)}</td>
+        <td className="px-3 py-2.5">{getLevelBadge(log.level)}</td>
+        <td className="px-3 py-2.5">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${sourceBadgeBg}`}>
+            {log.source}
+          </span>
+        </td>
+        <td className="px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 bg-blue-500/20 text-blue-400">
+              {getUserInitials(log)}
+            </div>
+            <span className={`text-xs ${textMain}`}>{getUserName(log)}</span>
+          </div>
+        </td>
+        <td className={`px-3 py-2.5 text-xs font-mono ${textMuted} truncate`}>{log.message}</td>
+        <td className={`px-3 py-2.5 text-xs font-mono ${textMuted}`}>{log.ip_address}</td>
+        <td className="px-3 py-2.5">{getStatusBadge(log.http_status)}</td>
+      </tr>
+      {isClickable && isExpanded && (
+        <tr className={`border-b ${borderColor}`}>
+          <td colSpan={7} className="p-0">
+            <div className={`p-2 font-mono text-xs ${textMuted} whitespace-pre-wrap ${detailBg}`}>
+              {log.detail || `source: ${log.source}\nevent: ${log.message}\nuser: ${log.user_email || "anonymous"}\nip: ${log.ip_address}\nstatus: ${log.http_status || "N/A"}`}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+});
 
-        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] p-12 shadow-sm">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center mb-4">
-              <FileCode className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Страница в разработке
-            </h2>
-            <p className="text-gray-500 max-w-md mb-6">
-              Раздел "Логи" находится в активной разработке.
-              Здесь будет отображаться журнал системных событий и действий пользователей.
-            </p>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Clock className="h-4 w-4" />
-              <span>Ожидаемый запуск: скоро</span>
-            </div>
+export default function LogsPage({ isDarkTheme = false }: LogsPageProps) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Hooks
+  const {
+    level,
+    setLevel,
+    source,
+    setSource,
+    search,
+    setSearch,
+    timeFilter,
+    setTimeFilter,
+    sort,
+    setSort,
+    getFilters,
+    resetFilters,
+  } = useLogsFilters();
+
+  const { limit, setLimit, page, setPage, getPagination, resetPagination } = useLogsPagination(10);
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  const filters = getFilters();
+  const pagination = getPagination();
+
+  const { logs, total, loading: logsLoading, error: logsError, refetch: refetchLogs } = useLogsData(filters, pagination);
+  const { stats, loading: statsLoading } = useLogsStats();
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  const getLevelBadge = (level: string) => {
+    const styles = {
+      ERROR: "bg-red-500/20 text-red-400 border-red-500/30",
+      WARN: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      INFO: "bg-green-500/20 text-green-400 border-green-500/30",
+      DEBUG: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    };
+    const dotColors = {
+      ERROR: "bg-red-500",
+      WARN: "bg-amber-500",
+      INFO: "bg-green-500",
+      DEBUG: "bg-blue-500",
+    };
+    const displayLevel = level === "WARNING" ? "WARN" : level;
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium border ${styles[displayLevel as keyof typeof styles]}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[displayLevel as keyof typeof dotColors]}`}></span>
+        {displayLevel}
+      </span>
+    );
+  };
+
+  const getStatusBadge = (status: number | null) => {
+    if (!status) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">—</span>;
+    if (status >= 500) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">{status}</span>;
+    if (status >= 400) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">{status}</span>;
+    if (status >= 200) return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">{status}</span>;
+    return <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">{status}</span>;
+  };
+
+  const getUserInitials = (log: LogEntry) => {
+    if (log.user_full_name) {
+      return log.user_full_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    if (log.user_email) {
+      return log.user_email.slice(0, 2).toUpperCase();
+    }
+    return "?";
+  };
+
+  const getUserName = (log: LogEntry) => {
+    return log.user_full_name || log.user_email || "anonymous";
+  };
+
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      fractionalSecondDigits: 3,
+    });
+  };
+
+  const formatFullDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleString("ru-RU", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await exportLogs(filters);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `logs_${new Date().toISOString()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Не удалось экспортировать логи");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteOldLogs = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteOldLogs(1); // Delete logs older than 1 day for testing
+      alert(`Удалено ${result.deleted_count} записей`);
+      refetchLogs();
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Не удалось удалить старые логи");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleFilterChange = (callback: () => void) => {
+    callback();
+    resetPagination();
+  };
+
+  const totalPages = Math.ceil(total / limit);
+
+  const bgColor = isDarkTheme ? "bg-[#111111]" : "bg-gray-50";
+  const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const inputBg = isDarkTheme ? "bg-[#0d0d0d] border-[#30363d]" : "bg-white border-gray-300";
+  const textMain = isDarkTheme ? "text-white" : "text-gray-900";
+  const textMuted = isDarkTheme ? "text-gray-500" : "text-gray-500";
+  const textDim = isDarkTheme ? "text-[#6e7681]" : "text-gray-400";
+  const hoverBg = isDarkTheme ? "hover:bg-[#1f2937]" : "hover:bg-gray-50";
+
+  return (
+    <div className={`min-h-screen ${bgColor} ${textMain}`}>
+      <div className="p-5 max-w-[1600px] mx-auto">
+        {/* Page Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-lg font-semibold">Логи</h1>
+            <p className={`text-xs ${textMuted} mt-0.5`}>Системные события, ошибки и аудит действий</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${cardBg} ${hoverBg} transition-colors disabled:opacity-60`}
+            >
+              <Download className="w-3.5 h-3.5" />
+              {isExporting ? "Экспорт..." : "Экспорт"}
+            </button>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20 transition-colors`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Очистить старые
+            </button>
           </div>
         </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-2.5 mb-4">
+          <div className={`p-3 rounded-xl border ${cardBg}`}>
+            <div className={`text-xs ${textMuted} mb-1`}>Всего записей</div>
+            <div className="text-xl font-semibold">{stats?.total ?? "-"}</div>
+            <div className={`text-xs ${textMuted} mt-0.5`}>За всё время</div>
+          </div>
+          <div className={`p-3 rounded-xl border ${cardBg}`}>
+            <div className={`text-xs ${textMuted} mb-1`}>Ошибок сегодня</div>
+            <div className="text-xl font-semibold text-red-500">{stats?.errors_today ?? "-"}</div>
+            <div className={`text-xs ${textMuted} mt-0.5`}>За сегодня</div>
+          </div>
+          <div className={`p-3 rounded-xl border ${cardBg}`}>
+            <div className={`text-xs ${textMuted} mb-1`}>Предупреждений</div>
+            <div className="text-xl font-semibold text-amber-500">{stats?.warnings_today ?? "-"}</div>
+            <div className={`text-xs ${textMuted} mt-0.5`}>За сегодня</div>
+          </div>
+          <div className={`p-3 rounded-xl border ${cardBg}`}>
+            <div className={`text-xs ${textMuted} mb-1`}>Успешных запросов</div>
+            <div className="text-xl font-semibold text-green-500">{stats?.success_today ?? "-"}</div>
+            <div className={`text-xs ${textMuted} mt-0.5`}>За сегодня</div>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className={`flex items-center gap-2 p-3 rounded-xl border mb-4 ${cardBg}`}>
+          <div className={`flex items-center gap-1.5 flex-1 px-2.5 py-1.5 rounded-lg border ${inputBg}`}>
+            <Search className="w-3.5 h-3.5 text-gray-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Поиск по сообщению, пользователю, IP..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`bg-transparent border-none outline-none text-xs flex-1 ${textMain} placeholder-gray-500`}
+            />
+          </div>
+          <div className={`w-px h-5 ${isDarkTheme ? "bg-[#30363d]" : "bg-gray-300"}`}></div>
+          <select
+            value={level}
+            onChange={(e) => handleFilterChange(() => setLevel(e.target.value as any))}
+            className={`px-2 py-1.5 rounded-lg border text-xs cursor-pointer ${inputBg} ${textMain}`}
+          >
+            <option value="">Все уровни</option>
+            <option value="ERROR">ERROR</option>
+            <option value="WARNING">WARN</option>
+            <option value="INFO">INFO</option>
+            <option value="DEBUG">DEBUG</option>
+          </select>
+          <select
+            value={source}
+            onChange={(e) => handleFilterChange(() => setSource(e.target.value as any))}
+            className={`px-2 py-1.5 rounded-lg border text-xs cursor-pointer ${inputBg} ${textMain}`}
+          >
+            <option value="">Все источники</option>
+            <option value="auth">auth</option>
+            <option value="repositories">repositories</option>
+            <option value="webhooks">webhooks</option>
+            <option value="admin">admin</option>
+            <option value="gitea">gitea</option>
+            <option value="permissions">permissions</option>
+            <option value="courses">courses</option>
+          </select>
+          <select
+            value={timeFilter}
+            onChange={(e) => handleFilterChange(() => setTimeFilter(e.target.value as any))}
+            className={`px-2 py-1.5 rounded-lg border text-xs cursor-pointer ${inputBg} ${textMain}`}
+          >
+            <option value="today">Сегодня</option>
+            <option value="hour">За час</option>
+            <option value="week">За неделю</option>
+            <option value="month">За месяц</option>
+          </select>
+          <div className={`w-px h-5 ${isDarkTheme ? "bg-[#30363d]" : "bg-gray-300"}`}></div>
+          <select
+            value={sort}
+            onChange={(e) => handleFilterChange(() => setSort(e.target.value as any))}
+            className={`px-2 py-1.5 rounded-lg border text-xs cursor-pointer ${inputBg} ${textMain}`}
+          >
+            <option value="desc">Новые сначала</option>
+            <option value="asc">Старые сначала</option>
+          </select>
+        </div>
+
+        {/* Table */}
+        <div className={`rounded-xl border overflow-hidden ${cardBg}`}>
+          {logsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <span className={`text-sm ${textMuted}`}>Загрузка...</span>
+            </div>
+          ) : logsError ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <FileX className={`w-12 h-12 ${textMuted} mb-3`} />
+              <span className={`text-sm ${textMuted}`}>{logsError}</span>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <FileX className={`w-12 h-12 ${textMuted} mb-3`} />
+              <span className={`text-sm ${textMuted}`}>Логов не найдено</span>
+            </div>
+          ) : (
+            <>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className={`border-b ${isDarkTheme ? "border-[#30363d]" : "border-gray-200"}`}>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[120px]`}>Время</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[90px]`}>Уровень</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[110px]`}>Источник</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[160px]`}>Пользователь</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted}`}>Сообщение</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[110px]`}>IP</th>
+                    <th className={`text-xs font-semibold uppercase tracking-wider text-left px-3 py-2.5 ${textMuted} w-[70px]`}>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <LogRow
+                      key={log.id}
+                      log={log}
+                      isExpanded={expandedRows.has(log.id)}
+                      onToggle={toggleRow}
+                      isDarkTheme={isDarkTheme}
+                      getLevelBadge={getLevelBadge}
+                      getStatusBadge={getStatusBadge}
+                      getUserInitials={getUserInitials}
+                      getUserName={getUserName}
+                      formatTime={formatTime}
+                      formatFullDate={formatFullDate}
+                    />
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              <div className={`flex items-center justify-between px-4 py-3 border-t ${isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200"} text-sm ${textMuted}`}>
+                <span>Показано {logs.length} из {total}</span>
+                <div className="flex items-center gap-2">
+                  {page > 1 && (
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${isDarkTheme ? "bg-[#161616] border-[#30363d] text-[#8b949e] hover:bg-[#1f2937] hover:text-[#ccd0d4]" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                    >
+                      ←
+                    </button>
+                  )}
+                  <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg">
+                    {page}
+                  </span>
+                  {page < totalPages && (
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${isDarkTheme ? "bg-[#161616] border-[#30363d] text-[#8b949e] hover:bg-[#1f2937] hover:text-[#ccd0d4]" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                    >
+                      →
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span>По</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className={`px-1.5 py-1 rounded border text-xs cursor-pointer ${inputBg} ${textMain}`}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span>на странице</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Удалить старые логи"
+        message="Удалить записи старше 1 дня? Это действие необратимо."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onConfirm={handleDeleteOldLogs}
+        onCancel={() => setShowDeleteModal(false)}
+        isDangerous={true}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

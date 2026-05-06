@@ -3,12 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MTUCI Labs</title>
+    <title>git.mtuci</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon2.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Apply theme immediately before page renders to prevent flash
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <style>
+      /* Prevent flash of wrong background */
+      html, body { background-color: #ffffff; }
+      html.dark, html.dark body { background-color: #111111; }
+    </style>
   </head>
-  <body class="bg-[#c7b8ea] text-gray-900" style="font-family: 'Inter', sans-serif;">
+  <body class="bg-white dark:bg-[#111111] text-gray-900 dark:text-gray-100" style="font-family: 'Inter', sans-serif;">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

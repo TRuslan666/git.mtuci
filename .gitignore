@@ -15,23 +15,10 @@
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
-
-# Local environment configs
-.envrc
-.env.local.*
-*.local.js
-*.local.ts
 
 # OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Desktop.ini
+Thumbs.db
 
 # Logs
 *.log
@@ -172,48 +159,7 @@ data/
 gitea-data/
 gitea-repositories/
 gitea/
-#8 374.3 debconf: falling back to frontend: Noninteractive
-#8 388.9 Fetched 54.9 MB in 4min 58s (184 kB/s)
-#8 395.7 Killed
-#8 ERROR: process "/bin/sh -c apt-get update && apt-get install -y --no-install-recommends     gcc     libpq-dev     postgresql-client     curl     && rm -rf /var/lib/apt/lists/*" did not complete successfully: cannot allocate memory
-------
- > [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     gcc     libpq-dev     postgresql-client     curl     && rm -rf /var/lib/apt/lists/*:
-374.3 debconf: (TERM is not set, so the dialog frontend is not usable.)
-374.3 debconf: falling back to frontend: Readline
-374.3 debconf: unable to initialize frontend: Readline
-374.3 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/x86_64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8, <STDIN> line 67.)
-374.3 debconf: falling back to frontend: Teletype
-374.3 debconf: unable to initialize frontend: Teletype
-374.3 debconf: (This frontend requires a controlling tty.)
-374.3 debconf: falling back to frontend: Noninteractive
-388.9 Fetched 54.9 MB in 4min 58s (184 kB/s)
-395.7 Killed
-------
-[+] build 0/1
- - Image gitmtuci-main-api Building                                                                               400.5s
-Dockerfile:7
 
---------------------
-
-   6 |     # Install system dependencies (for asyncpg, bcrypt, postgresql-client)
-
-   7 | >>> RUN apt-get update && apt-get install -y --no-install-recommends \
-
-   8 | >>>     gcc \
-
-   9 | >>>     libpq-dev \
-
-  10 | >>>     postgresql-client \
-
-  11 | >>>     curl \
-
-  12 | >>>     && rm -rf /var/lib/apt/lists/*
-
-  13 |
-
---------------------
-
-failed to solve: ResourceExhausted: process "/bin/sh -c apt-get update && apt-get install -y --no-install-recommends     gcc     libpq-dev     postgresql-client     curl     && rm -rf /var/lib/apt/lists/*" did not complete successfully: cannot allocate memory
 # ============================================
 # Secrets & Keys
 # ============================================
@@ -256,3 +202,5 @@ TODO.md
 *.pid.lock
 
 backups
+test-repo
+backend/LOGS_BACKEND_ROADMAP.md

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Shield,
   Briefcase,
@@ -12,19 +12,47 @@ import {
   Users,
   GraduationCap,
   Settings,
+  Loader2,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import {
+  getRoles,
+  getRolePermissions,
+  getLaborants,
+  saveRolePermissions,
+  resetRolePermissions,
+  trustLaborant,
+  untrustLaborant,
+  getAuditLogs,
+  type Role,
+  type PermissionCategory,
+  type Laborant,
+  type AuditLog
+} from "../api/rolesApi";
+import { getMe, updateAssistantGrading } from "../api/authApi";
+import toast from "react-hot-toast";
+import AdminPageHeader from "../components/AdminPageHeader";
 
-type RoleType = "admin" | "teacher" | "student" | "assistant" | "guest";
+type RoleType = "admin" | "teacher" | "student" | "laborant";
 type PermissionLevel = "read" | "write" | "delete" | "none";
 
-interface Role {
-  id: RoleType;
-  name: string;
-  description: string;
-  icon: React.ElementType;
-  iconBg: string;
-  userCount: number;
-  isSystem: boolean;
+// Russian pluralization helper
+function pluralizeUsers(count: number): string {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+    return "пользователей";
+  }
+  if (lastDigit === 1) {
+    return "пользователь";
+  }
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return "пользователя";
+  }
+  return "пользователей";
 }
 
 interface Permission {
@@ -35,169 +63,31 @@ interface Permission {
   enabled: boolean;
 }
 
-interface PermissionCategory {
+interface PermissionCategoryState {
   title: string;
   icon: React.ElementType;
   permissions: Permission[];
 }
 
-const roles: Role[] = [
-  {
-    id: "admin",
-    name: "Администратор",
-    description: "Полный доступ ко всем функциям системы",
-    icon: Shield,
-    iconBg: "bg-yellow-500/20 text-yellow-400",
-    userCount: 12,
-    isSystem: true,
-  },
-  {
-    id: "teacher",
-    name: "Преподаватель",
-    description: "Управление курсами и оценками студентов",
-    icon: Briefcase,
-    iconBg: "bg-purple-500/20 text-purple-400",
-    userCount: 56,
-    isSystem: true,
-  },
-  {
-    id: "assistant",
-    name: "Лаборант",
-    description: "Проверка лабораторных работ, консультирование студентов и модерирование репозиториев по поручению преподавателя",
-    icon: Microscope,
-    iconBg: "bg-emerald-500/20 text-emerald-400",
-    userCount: 23,
-    isSystem: false,
-  },
-  {
-    id: "student",
-    name: "Студент",
-    description: "Доступ к курсам и сдача заданий",
-    icon: User,
-    iconBg: "bg-blue-500/20 text-blue-400",
-    userCount: 1189,
-    isSystem: false,
-  },
-  {
-    id: "guest",
-    name: "Гость",
-    description: "Только просмотр общедоступных материалов",
-    icon: UserPlus,
-    iconBg: "bg-gray-500/20 text-gray-400",
-    userCount: 47,
-    isSystem: false,
-  },
-];
-
-const basePermissionCategories: PermissionCategory[] = [
-  {
-    title: "РЕПОЗИТОРИИ",
-    icon: GitBranch,
-    permissions: [
-      { id: "repo_view", name: "Просмотр репозиториев", description: "Видеть список и содержимое репозиториев", level: "read", enabled: true },
-      { id: "repo_view_students", name: "Просмотр репозиториев студентов", description: "Доступ к репозиториям студентов по поручению преподавателя", level: "read", enabled: false },
-      { id: "repo_create", name: "Создание репозиториев", description: "Создавать новые репозитории", level: "write", enabled: false },
-      { id: "repo_delete", name: "Удаление репозиториев", description: "Удалять репозитории", level: "delete", enabled: false },
-      { id: "repo_comment", name: "Добавление комментариев к коду", description: "Оставлять комментарии в pull requests", level: "write", enabled: false },
-    ],
-  },
-  {
-    title: "ПОЛЬЗОВАТЕЛИ И ГРУППЫ",
-    icon: Users,
-    permissions: [
-      { id: "user_view", name: "Просмотр пользователей", description: "Видеть профили других пользователей", level: "read", enabled: true },
-      { id: "user_edit", name: "Редактирование пользователей", description: "Изменять данные пользователей", level: "write", enabled: false },
-      { id: "group_manage", name: "Управление группами", description: "Создавать и редактировать группы", level: "write", enabled: false },
-    ],
-  },
-  {
-    title: "ОЦЕНКИ И ЗАДАНИЯ",
-    icon: GraduationCap,
-    permissions: [
-      { id: "assignment_view", name: "Просмотр заданий", description: "Видеть список всех заданий", level: "read", enabled: true },
-      { id: "assignment_create", name: "Создание заданий", description: "Создавать новые задания", level: "write", enabled: false },
-      { id: "grade_edit", name: "Выставление оценок", description: "Изменять оценки студентов", level: "write", enabled: false },
-      { id: "lab_accept", name: "Прием лабораторных работ", description: "Смена статуса на 'Зачтено/Пересдача'", level: "write", enabled: false },
-      { id: "grade_view_groups", name: "Просмотр оценок в своих группах", description: "Видеть оценки студентов по поручению преподавателя", level: "read", enabled: false },
-    ],
-  },
-  {
-    title: "СИСТЕМА",
-    icon: Settings,
-    permissions: [
-      { id: "settings_view", name: "Просмотр настроек", description: "Видеть системные настройки", level: "read", enabled: true },
-      { id: "settings_edit", name: "Изменение настроек", description: "Модифицировать системные параметры", level: "delete", enabled: false },
-      { id: "logs_view", name: "Просмотр логов", description: "Доступ к системным логам", level: "read", enabled: false },
-    ],
-  },
-];
-
-// Role-specific permission overrides
-const rolePermissionOverrides: Record<RoleType, Record<string, boolean>> = {
-  admin: {
-    repo_create: true,
-    repo_delete: true,
-    user_edit: true,
-    group_manage: true,
-    assignment_create: true,
-    grade_edit: true,
-    lab_accept: true,
-    settings_edit: true,
-    logs_view: true,
-  },
-  teacher: {
-    repo_create: true,
-    user_edit: true,
-    group_manage: true,
-    assignment_create: true,
-    grade_edit: true,
-    lab_accept: true,
-    logs_view: true,
-  },
-  assistant: {
-    repo_view_students: true,
-    repo_comment: true,
-    lab_accept: true,
-    grade_view_groups: true,
-    logs_view: true,
-  },
-  student: {
-    repo_create: true,
-  },
-  guest: {},
+// Icon mapping for role icons from API
+const iconMap: Record<string, React.ElementType> = {
+  Shield,
+  Briefcase,
+  Microscope,
+  User,
+  UserPlus,
+  GitBranch,
+  Users,
+  GraduationCap,
+  Settings,
 };
 
-function getPermissionsForRole(role: RoleType): PermissionCategory[] {
-  const overrides = rolePermissionOverrides[role];
-  return basePermissionCategories.map((category) => ({
-    ...category,
-    permissions: category.permissions.map((permission) => ({
-      ...permission,
-      enabled: overrides[permission.id] ?? permission.enabled,
-    })),
-  }));
-}
-
-// Trusted assistants for teacher role
-interface TrustedAssistant {
-  id: string;
-  name: string;
-  initials: string;
-  trusted: boolean;
-}
-
-const mockAssistants: TrustedAssistant[] = [
-  { id: "1", name: "Петров И.А.", initials: "ПИ", trusted: true },
-  { id: "2", name: "Смирнова Е.К.", initials: "СЕ", trusted: false },
-  { id: "3", name: "Кузнецов Д.М.", initials: "КД", trusted: true },
-];
-
-function getLevelBadge(level: PermissionLevel) {
+function getLevelBadge(level: PermissionLevel, isDarkTheme: boolean) {
   const styles = {
-    read: "bg-blue-500/20 text-blue-400",
-    write: "bg-white text-gray-900",
-    delete: "bg-red-500/20 text-red-400",
-    none: "bg-gray-700 text-gray-400",
+    read: isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700",
+    write: isDarkTheme ? "bg-[#252525] text-[#ccd0d4]" : "bg-white text-gray-900",
+    delete: isDarkTheme ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-700",
+    none: isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681]" : "bg-gray-200 text-gray-500",
   };
   const labels = {
     read: "Чтение",
@@ -212,11 +102,12 @@ function getLevelBadge(level: PermissionLevel) {
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({ checked, onChange, disabled, isDarkTheme }: { checked: boolean; onChange: () => void; disabled?: boolean; isDarkTheme?: boolean }) {
   return (
     <button
       onClick={onChange}
-      className={`relative w-11 h-6 rounded-full transition-colors ${checked ? "bg-blue-600" : "bg-gray-700"}`}
+      disabled={disabled}
+      className={`relative w-11 h-6 rounded-full transition-colors ${checked ? "bg-blue-600" : isDarkTheme ? "bg-[#2d2d2d]" : "bg-gray-300"} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
       <span
         className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`}
@@ -225,22 +116,117 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   );
 }
 
-export default function RolesPage() {
-  const [selectedRole, setSelectedRole] = useState<RoleType>("teacher");
-  const [categories, setCategories] = useState(() => getPermissionsForRole("teacher"));
-  const [assistants, setAssistants] = useState(mockAssistants);
-  const [allowAssistantGrading, setAllowAssistantGrading] = useState(true);
+interface RolesPageProps {
+  isDarkTheme?: boolean;
+}
 
-  const currentRole = roles.find((r) => r.id === selectedRole)!;
+export default function RolesPage({ isDarkTheme = true }: RolesPageProps) {
+  const [selectedRole, setSelectedRole] = useState<RoleType>("admin");
+  const [categories, setCategories] = useState<PermissionCategoryState[]>([]);
+  const [initialCategories, setInitialCategories] = useState<PermissionCategoryState[]>([]);
+  const [assistants, setAssistants] = useState<Laborant[]>([]);
+  const [allowAssistantGrading, setAllowAssistantGrading] = useState(true);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
+
+  // Check if permissions have changed
+  const hasChanges = JSON.stringify(categories) !== JSON.stringify(initialCategories);
+
+  // Load audit logs
+  const loadAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const logs = await getAuditLogs(selectedRole, 20);
+      setAuditLogs(logs);
+    } catch (error) {
+      console.error("Failed to load audit logs:", error);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showAuditLogs && currentRole?.id === "admin") {
+      loadAuditLogs();
+    }
+  }, [showAuditLogs, selectedRole]);
+
+  // Load roles on mount
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const data = await getRoles();
+        setRoles(data);
+      } catch (error) {
+        console.error("Failed to load roles:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRoles();
+  }, []);
+
+  // Load permissions and laborants when role changes
+  useEffect(() => {
+    const fetchData = async () => {
+      setPermissionsLoading(true);
+      // Reset assistants immediately to avoid showing old data
+      setAssistants([]);
+      try {
+        const [permsData, laborantsData, meData] = await Promise.all([
+          getRolePermissions(selectedRole),
+          selectedRole === "teacher" ? getLaborants() : Promise.resolve([]),
+          selectedRole === "teacher" ? getMe() : Promise.resolve(null),
+        ]);
+        
+        console.log("Loaded permissions for", selectedRole, permsData);
+        console.log("Loaded laborants:", laborantsData);
+        
+        // Load allow_assistant_grading from user data
+        if (meData && meData.allow_assistant_grading !== undefined) {
+          setAllowAssistantGrading(meData.allow_assistant_grading);
+        }
+        
+        // Map API categories to component format with icons
+        const mappedCategories: PermissionCategoryState[] = permsData.map((cat) => {
+          const iconMap: Record<string, React.ElementType> = {
+            "РЕПОЗИТОРИИ": GitBranch,
+            "ПОЛЬЗОВАТЕЛИ И ГРУППЫ": Users,
+            "ОЦЕНКИ И ЗАДАНИЯ": GraduationCap,
+            "СИСТЕМА": Settings,
+          };
+          return {
+            title: cat.title,
+            icon: iconMap[cat.title] || Settings,
+            permissions: cat.permissions,
+          };
+        });
+        
+        setCategories(mappedCategories);
+        setInitialCategories(mappedCategories);
+        setAssistants(laborantsData);
+      } catch (error) {
+        console.error("Failed to load role data:", error);
+      } finally {
+        setPermissionsLoading(false);
+      }
+    };
+    fetchData();
+  }, [selectedRole]);
+
+  const currentRole = roles.find((r) => r.id === selectedRole);
 
   // Update permissions when role changes
   const handleRoleChange = (role: RoleType) => {
     setSelectedRole(role);
-    setCategories(getPermissionsForRole(role));
   };
 
   const togglePermission = (categoryIndex: number, permissionIndex: number) => {
-    setCategories((prev: PermissionCategory[]) => {
+    setCategories((prev) => {
       const next = [...prev];
       next[categoryIndex] = {
         ...next[categoryIndex],
@@ -254,42 +240,142 @@ export default function RolesPage() {
     });
   };
 
-  const toggleAssistantTrust = (id: string) => {
-    setAssistants((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, trusted: !a.trusted } : a))
-    );
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const toggleAssistantTrust = async (id: string) => {
+    const assistant = assistants.find((a) => a.id === id);
+    if (!assistant || togglingId) return;
+
+    setTogglingId(id);
+    try {
+      if (assistant.trusted) {
+        await untrustLaborant(id);
+        toast.success("Лаборант убран из доверенных");
+      } else {
+        await trustLaborant(id);
+        toast.success("Лаборант добавлен в доверенные");
+      }
+      // Update local state
+      setAssistants((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, trusted: !a.trusted } : a))
+      );
+    } catch (error) {
+      toast.error("Ошибка при изменении доверия");
+      console.error(error);
+    } finally {
+      setTogglingId(null);
+    }
   };
 
+  // Save permissions
+  const handleSave = async () => {
+    if (!currentRole) return;
+    try {
+      const permissionsData = categories.map((cat) => ({
+        title: cat.title,
+        permissions: cat.permissions.map((p) => ({
+          id: p.id,
+          enabled: p.enabled,
+        })),
+      }));
+      console.log("Saving permissions for role:", currentRole.id, permissionsData);
+      const result = await saveRolePermissions(currentRole.id, permissionsData);
+      console.log("Save result:", result);
+      // Update initial state to reflect saved changes
+      setInitialCategories(categories);
+      toast.success("Права доступа сохранены");
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error("Ошибка при сохранении прав. Проверьте консоль (F12)");
+    }
+  };
+
+  // Reset permissions to defaults
+  const handleReset = async () => {
+    if (!currentRole) return;
+    try {
+      console.log("Resetting permissions for role:", currentRole.id);
+      const defaultPerms = await resetRolePermissions(currentRole.id);
+      console.log("Reset result:", defaultPerms);
+      const mappedCategories: PermissionCategoryState[] = defaultPerms.map((cat) => ({
+        title: cat.title,
+        icon: iconMap[cat.title] || Settings,
+        permissions: cat.permissions,
+      }));
+      setCategories(mappedCategories);
+      toast.success("Права сброшены по умолчанию");
+    } catch (error) {
+      console.error("Reset error:", error);
+      toast.error("Ошибка при сбросе прав. Проверьте консоль (F12)");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  // Theme-based colors
+  const pageBg = isDarkTheme ? "bg-[#111111] text-white" : "bg-[#f8f9fa] text-gray-900";
+  const cardBg = isDarkTheme ? "bg-[#161616] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const cardBgLight = isDarkTheme ? "bg-[#252525]" : "bg-gray-100";
+  const cardBgLighter = isDarkTheme ? "bg-[#1e1e1e]" : "bg-white";
+  const textPrimary = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const textSecondary = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const textTertiary = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const roleCardText = isDarkTheme ? "text-[#ccd0d4]" : "text-gray-900";
+  const roleCardDesc = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const roleCardCount = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const headerText = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const activeBadge = isDarkTheme ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700";
+  const systemBadge = isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681]" : "bg-gray-200 text-gray-500";
+  const dividerColor = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const hoverBg = isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-100";
+  const resetBtn = isDarkTheme ? "bg-[#252525] border-[#2d2d2d] text-[#8b949e] hover:text-white" : "bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-900";
+  const saveBtnActive = "bg-blue-600 text-white hover:bg-blue-700";
+  const saveBtnInactive = isDarkTheme ? "bg-[#2d2d2d] text-[#6e7681] cursor-not-allowed" : "bg-gray-300 text-gray-500 cursor-not-allowed";
+  const sectionHeader = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const assistantCard = isDarkTheme ? "bg-[#1e1e1e] border-[#30363d]" : "bg-white border-gray-200";
+  const assistantHeader = isDarkTheme ? "bg-[#252525]" : "bg-gray-50";
+  const trustedText = isDarkTheme ? "text-emerald-400" : "text-emerald-600";
+  const untrustedText = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const auditCard = isDarkTheme ? "bg-[#1e1e1e] border-[#2d2d2d]" : "bg-white border-gray-200";
+  const auditTag = isDarkTheme ? "bg-[#252525] text-[#8b949e]" : "bg-gray-100 text-gray-600";
+
   return (
-    <div className="h-full overflow-y-auto bg-[#f5f3fa] dark:bg-[#0f0f10] text-gray-900 dark:text-white transition-colors">
+    <div className={`h-full overflow-y-auto ${pageBg}`}>
       <div className="max-w-7xl mx-auto py-6 px-6 pr-2 space-y-6 pb-20">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Роли и доступ</h1>
-          <span className="text-sm text-gray-500">5 ролей</span>
-        </div>
+        <AdminPageHeader
+          isDarkTheme={isDarkTheme}
+          title="Роли и доступ"
+          subtitle={`${roles.length} ролей`}
+        />
 
         {/* Role Cards */}
         <div className="grid grid-cols-5 gap-4">
           {roles.map((role) => {
-            const Icon = role.icon;
+            const Icon = iconMap[role.icon] || User;
             const isActive = selectedRole === role.id;
             return (
               <button
                 key={role.id}
-                onClick={() => handleRoleChange(role.id)}
-                className={`text-left p-5 rounded-xl bg-white dark:bg-[#1e1e1e] border transition-all shadow-sm ${
+                onClick={() => handleRoleChange(role.id as RoleType)}
+                className={`text-left p-5 rounded-xl border transition-all ${cardBg} ${
                   isActive
                     ? "border-blue-500/50 shadow-lg shadow-blue-500/10"
-                    : "border-[#d4cfe6] dark:border-[#2d2d2d] hover:border-[#b8b0d9] dark:hover:border-[#3f3f46]"
+                    : isDarkTheme ? "hover:border-[#3d3d3d]" : "hover:border-gray-300"
                 }`}
               >
-                <div className={`w-10 h-10 rounded-lg ${role.iconBg} flex items-center justify-center mb-3`}>
+                <div className={`w-10 h-10 rounded-lg ${role.icon_bg} flex items-center justify-center mb-3`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">{role.name}</h3>
-                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{role.description}</p>
-                <p className="text-sm text-gray-400">{role.userCount} пользователей</p>
+                <h3 className={`text-base font-semibold mb-1 ${roleCardText}`}>{role.name}</h3>
+                <p className={`text-xs mb-3 line-clamp-2 ${roleCardDesc}`}>{role.description}</p>
+                <p className={`text-sm ${roleCardCount}`}>{role.user_count} {pluralizeUsers(role.user_count)}</p>
               </button>
             );
           })}
@@ -298,35 +384,35 @@ export default function RolesPage() {
         {/* Split Screen */}
         <div className="grid grid-cols-[35%_1fr] gap-6">
           {/* Left Column - Role Selection */}
-          <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <div className={`rounded-xl border p-5 ${cardBg}`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wider mb-4 ${headerText}`}>
               Выбрать роль для редактирования
             </h2>
             <div className="space-y-2">
               {roles.map((role) => {
-                const Icon = role.icon;
+                const Icon = iconMap[role.icon] || User;
                 const isSelected = selectedRole === role.id;
                 return (
                   <button
                     key={role.id}
-                    onClick={() => handleRoleChange(role.id)}
+                    onClick={() => handleRoleChange(role.id as RoleType)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                      isSelected ? "bg-gray-100 dark:bg-[#252525]" : "hover:bg-gray-100 dark:hover:bg-[#252525]"
+                      isSelected ? cardBgLight : isDarkTheme ? "hover:bg-[#252525]" : "hover:bg-gray-100"
                     }`}
                   >
-                    <div className={`w-8 h-8 rounded-lg ${role.iconBg} flex items-center justify-center flex-shrink-0`}>
+                    <div className={`w-8 h-8 rounded-lg ${role.icon_bg} flex items-center justify-center flex-shrink-0`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{role.name}</p>
-                      <p className="text-xs text-gray-500">{role.userCount} пользователей</p>
+                      <p className={`text-sm font-medium ${textPrimary}`}>{role.name}</p>
+                      <p className={`text-xs ${textSecondary}`}>{role.user_count} {pluralizeUsers(role.user_count)}</p>
                     </div>
                     {isSelected ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${activeBadge}`}>
                         Выбрана
                       </span>
-                    ) : role.isSystem ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400">
+                    ) : role.is_system ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${systemBadge}`}>
                         Системная
                       </span>
                     ) : null}
@@ -337,19 +423,29 @@ export default function RolesPage() {
           </div>
 
           {/* Right Column - Permission Settings */}
-          <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-[#d4cfe6] dark:border-[#2d2d2d] p-5 shadow-sm">
+          <div className={`rounded-xl border p-5 shadow-sm ${cardBg}`}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{currentRole.name}</h2>
-                <span className="text-gray-500">—</span>
-                <span className="text-gray-400">права доступа</span>
+                <h2 className={`text-lg font-semibold ${textPrimary}`}>{currentRole?.name || "Роль"}</h2>
+                <span className={textSecondary}>—</span>
+                <span className={textTertiary}>права доступа</span>
               </div>
               <div className="flex items-center gap-2">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-[#252525] border border-[#d4cfe6] dark:border-[#2d2d2d] text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                <button
+                  onClick={handleReset}
+                  disabled={permissionsLoading || (!hasChanges && categories.length > 0)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${resetBtn}`}
+                >
                   <RotateCcw className="h-4 w-4" />
                   Сбросить
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-sm text-white hover:bg-blue-700 transition-colors">
+                <button
+                  onClick={handleSave}
+                  disabled={permissionsLoading || !hasChanges}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+                    hasChanges ? saveBtnActive : saveBtnInactive
+                  }`}
+                >
                   <Save className="h-4 w-4" />
                   Сохранить
                 </button>
@@ -357,14 +453,14 @@ export default function RolesPage() {
             </div>
 
             <div className="space-y-6">
-              {categories.map((category: PermissionCategory, categoryIndex: number) => {
+              {categories.map((category, categoryIndex: number) => {
                 const CategoryIcon = category.icon;
                 return (
                   <div key={category.title}>
-                    {categoryIndex > 0 && <div className="border-t border-[#2d2d2d] mb-6" />}
+                    {categoryIndex > 0 && <div className={`border-t mb-6 ${dividerColor}`} />}
                     <div className="flex items-center gap-2 mb-4">
-                      <CategoryIcon className="h-4 w-4 text-gray-500" />
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <CategoryIcon className={`h-4 w-4 ${sectionHeader}`} />
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider ${sectionHeader}`}>
                         {category.title}
                       </h3>
                     </div>
@@ -372,17 +468,18 @@ export default function RolesPage() {
                       {category.permissions.map((permission: Permission, permissionIndex: number) => (
                         <div
                           key={permission.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-[#252525]"
+                          className={`flex items-center justify-between p-3 rounded-lg ${cardBgLight}`}
                         >
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{permission.name}</p>
-                            <p className="text-xs text-gray-500">{permission.description}</p>
+                            <p className={`text-sm font-medium ${textPrimary}`}>{permission.name}</p>
+                            <p className={`text-xs ${textSecondary}`}>{permission.description}</p>
                           </div>
                           <div className="flex items-center gap-3">
-                            {getLevelBadge(permission.level)}
+                            {getLevelBadge(permission.level, isDarkTheme)}
                             <Toggle
                               checked={permission.enabled}
                               onChange={() => togglePermission(categoryIndex, permissionIndex)}
+                              isDarkTheme={isDarkTheme}
                             />
                           </div>
                         </div>
@@ -392,54 +489,131 @@ export default function RolesPage() {
                 );
               })}
 
+              {/* Audit Logs - Only for Admin */}
+              {currentRole?.id === "admin" && (
+                <>
+                  <div className={`border-t mb-6 ${dividerColor}`} />
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => setShowAuditLogs(!showAuditLogs)}
+                      className={`flex items-center justify-between w-full p-3 rounded-lg transition-colors ${cardBgLight} ${hoverBg}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <History className={`h-4 w-4 ${sectionHeader}`} />
+                        <span className={`text-sm font-medium ${textPrimary}`}>
+                          История изменений прав
+                        </span>
+                      </div>
+                      {showAuditLogs ? (
+                        <ChevronUp className={`h-4 w-4 ${textSecondary}`} />
+                      ) : (
+                        <ChevronDown className={`h-4 w-4 ${textSecondary}`} />
+                      )}
+                    </button>
+
+                    {showAuditLogs && (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {auditLoading ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className={`h-5 w-5 animate-spin ${textSecondary}`} />
+                          </div>
+                        ) : auditLogs.length === 0 ? (
+                          <p className={`text-sm text-center py-4 ${textSecondary}`}>
+                            Нет записей для этой роли
+                          </p>
+                        ) : (
+                          auditLogs.map((log) => (
+                            <div
+                              key={log.id}
+                              className={`p-3 rounded-lg border ${auditCard}`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`text-sm font-medium ${textPrimary}`}>
+                                  {log.actor_name}
+                                </span>
+                                <span className={`text-xs ${textSecondary}`}>
+                                  {new Date(log.created_at).toLocaleString("ru-RU")}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className={`px-2 py-0.5 rounded ${auditTag}`}>
+                                  {log.target_role}
+                                </span>
+                                <span className={textSecondary}>
+                                  {log.action === "save_batch" ? "изменил права" :
+                                   log.action === "reset" ? "сбросил права" : log.action}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
               {/* Assistant Management - Only for Teacher role */}
               {selectedRole === "teacher" && (
                 <>
-                  <div className="border-t border-[#2d2d2d] mb-6" />
+                  <div className={`border-t mb-6 ${dividerColor}`} />
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-4">
-                      <Users className="h-4 w-4 text-gray-500" />
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <Users className={`h-4 w-4 ${sectionHeader}`} />
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider ${sectionHeader}`}>
                         УПРАВЛЕНИЕ АССИСТЕНТАМИ
                       </h3>
                     </div>
 
-                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#252525]">
+                    <div className={`p-4 rounded-lg ${assistantHeader}`}>
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">Разрешить лаборантам проверку моих курсов</p>
-                          <p className="text-xs text-gray-500">Доверенные лаборанты смогут выставлять оценки</p>
+                          <p className={`text-sm font-medium ${textPrimary}`}>Разрешить лаборантам проверку моих курсов</p>
+                          <p className={`text-xs ${textSecondary}`}>Доверенные лаборанты смогут выставлять оценки</p>
                         </div>
                         <Toggle
                           checked={allowAssistantGrading}
-                          onChange={() => setAllowAssistantGrading(!allowAssistantGrading)}
+                          onChange={async () => {
+                            const newValue = !allowAssistantGrading;
+                            setAllowAssistantGrading(newValue);
+                            try {
+                              await updateAssistantGrading(newValue);
+                              toast.success(newValue ? "Лаборантам разрешена проверка" : "Лаборантам запрещена проверка");
+                            } catch (error) {
+                              toast.error("Ошибка при сохранении настройки");
+                              setAllowAssistantGrading(!newValue); // Revert on error
+                            }
+                          }}
+                          isDarkTheme={isDarkTheme}
                         />
                       </div>
 
                       {allowAssistantGrading && (
-                        <div className="mt-4 pt-4 border-t border-[#2d2d2d]">
-                          <p className="text-xs text-gray-400 mb-3">
+                        <div className={`mt-4 pt-4 border-t ${dividerColor}`}>
+                          <p className={`text-xs mb-3 ${textTertiary}`}>
                             Только выбранные лаборанты смогут выставлять оценки и менять статусы работ в ваших курсах
                           </p>
                           <div className="space-y-2">
                             {assistants.map((assistant) => (
                               <div
                                 key={assistant.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-[#1e1e1e] border border-[#d4cfe6] dark:border-transparent"
+                                className={`flex items-center justify-between p-3 rounded-lg border ${assistantCard}`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                    <span className="text-xs font-medium text-emerald-400">{assistant.initials}</span>
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkTheme ? "bg-emerald-500/20" : "bg-emerald-100"}`}>
+                                    <span className={`text-xs font-medium ${isDarkTheme ? "text-emerald-400" : "text-emerald-600"}`}>{assistant.initials}</span>
                                   </div>
-                                  <span className="text-sm text-gray-900 dark:text-white">{assistant.name}</span>
+                                  <span className={`text-sm ${textPrimary}`}>{assistant.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className={`text-xs ${assistant.trusted ? "text-emerald-400" : "text-gray-500"}`}>
+                                  <span className={`text-xs ${assistant.trusted ? trustedText : untrustedText}`}>
                                     {assistant.trusted ? "Доверенный" : "Не доверенный"}
                                   </span>
                                   <Toggle
                                     checked={assistant.trusted}
                                     onChange={() => toggleAssistantTrust(assistant.id)}
+                                    disabled={togglingId === assistant.id}
+                                    isDarkTheme={isDarkTheme}
                                   />
                                 </div>
                               </div>

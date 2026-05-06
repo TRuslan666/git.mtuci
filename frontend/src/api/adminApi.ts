@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo } from "./types";
+import type { AdminUserRead, UserRole, SystemMetrics, ServiceStatus, BackupInfo, TodayStats, HotRepoStat, TopUserStat, HourlyActivity, LogsResponse, LogsStats, LogsFilters, LogsPagination } from "./types";
 
 export async function getAdminUsers(): Promise<AdminUserRead[]> {
   return apiRequest<AdminUserRead[]>("/admin/users");
@@ -7,11 +7,17 @@ export async function getAdminUsers(): Promise<AdminUserRead[]> {
 
 export async function patchAdminUser(
   userId: string,
-  payload: { role: UserRole; is_blocked: boolean; group_name?: string | null; student_id?: string | null },
+  payload: { role: UserRole; is_blocked: boolean; is_pending?: boolean; group_name?: string | null; student_id?: string | null },
 ): Promise<AdminUserRead> {
   return apiRequest<AdminUserRead>(`/admin/users/${userId}`, {
     method: "PATCH",
     body: payload,
+  });
+}
+
+export async function approveUser(userId: string): Promise<AdminUserRead> {
+  return apiRequest<AdminUserRead>(`/admin/users/${userId}/approve`, {
+    method: "POST",
   });
 }
 
@@ -74,6 +80,23 @@ export async function getCommitsByFaculty(): Promise<FacultyCommitsStat[]> {
   return apiRequest<FacultyCommitsStat[]>("/stats/commits-by-faculty");
 }
 
+export interface MyCommitsResponse {
+  commits: number;
+  repositories: number;
+}
+
+export async function getMyCommits(): Promise<MyCommitsResponse> {
+  return apiRequest<MyCommitsResponse>("/stats/my-commits");
+}
+
+export interface TotalUsersResponse {
+  total_users: number;
+}
+
+export async function getTotalUsers(): Promise<TotalUsersResponse> {
+  return apiRequest<TotalUsersResponse>("/stats/total-users");
+}
+
 export interface ActiveRepositoryStat {
   id: string;
   name: string;
@@ -88,3 +111,125 @@ export async function getActiveRepositories(limit: number = 5): Promise<ActiveRe
   return apiRequest<ActiveRepositoryStat[]>(`/stats/active-repositories?limit=${limit}`);
 }
 
+export async function getGroups(): Promise<string[]> {
+  return apiRequest<string[]>("/groups");
+}
+
+export async function getTodayStats(): Promise<TodayStats> {
+  return apiRequest<TodayStats>("/stats/today");
+}
+
+export async function getHotRepos(): Promise<HotRepoStat[]> {
+  return apiRequest<HotRepoStat[]>("/stats/hot-repos");
+}
+
+export async function getTopUsers(): Promise<TopUserStat[]> {
+  return apiRequest<TopUserStat[]>("/stats/top-users");
+}
+
+export async function getHourlyActivity(): Promise<HourlyActivity[]> {
+  return apiRequest<HourlyActivity[]>("/stats/hourly-activity");
+}
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  user: string;
+  initials: string;
+  color: string;
+  repo: string;
+  message: string;
+  time: string;
+  tag: string;
+  timestamp: string;
+}
+
+export interface RecentActivityResponse {
+  activities: ActivityItem[];
+  count: number;
+  total: number;
+}
+
+export interface ActivityFilters {
+  search?: string;
+  activityType?: string;
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export async function getRecentActivity(
+  limit: number = 50,
+  offset: number = 0,
+  filters?: ActivityFilters
+): Promise<RecentActivityResponse> {
+  const params = new URLSearchParams();
+  params.append("limit", String(limit));
+  params.append("offset", String(offset));
+
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.activityType) params.append("activity_type", filters.activityType);
+  if (filters?.userId) params.append("user_id", filters.userId);
+  if (filters?.dateFrom && filters.dateFrom !== "undefined") params.append("date_from", filters.dateFrom);
+  if (filters?.dateTo && filters.dateTo !== "undefined") params.append("date_to", filters.dateTo);
+
+  return apiRequest<RecentActivityResponse>(`/activity/recent?${params.toString()}`);
+}
+
+// Logs API functions
+export async function getLogs(
+  filters?: LogsFilters,
+  pagination?: LogsPagination
+): Promise<LogsResponse> {
+  const params = new URLSearchParams();
+
+  if (filters?.level) params.append("level", filters.level);
+  if (filters?.source) params.append("source", filters.source);
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.date_from) params.append("date_from", filters.date_from);
+  if (filters?.date_to) params.append("date_to", filters.date_to);
+  if (filters?.sort) params.append("sort", filters.sort);
+
+  if (pagination) {
+    params.append("limit", String(pagination.limit));
+    params.append("offset", String(pagination.offset));
+  }
+
+  return apiRequest<LogsResponse>(`/admin/logs?${params.toString()}`);
+}
+
+export async function getLogsStats(): Promise<LogsStats> {
+  return apiRequest<LogsStats>("/admin/logs/stats");
+}
+
+export async function exportLogs(
+  filters?: LogsFilters
+): Promise<Blob> {
+  const params = new URLSearchParams();
+
+  if (filters?.level) params.append("level", filters.level);
+  if (filters?.source) params.append("source", filters.source);
+  if (filters?.search) params.append("search", filters.search);
+  if (filters?.date_from) params.append("date_from", filters.date_from);
+  if (filters?.date_to) params.append("date_to", filters.date_to);
+  if (filters?.sort) params.append("sort", filters.sort);
+
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${import.meta.env.VITE_API_URL ?? "/api"}/admin/logs/export?${params.toString()}`, {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+
+  return res.blob();
+}
+
+export async function deleteOldLogs(days: number = 30): Promise<{ deleted_count: number }> {
+  return apiRequest<{ deleted_count: number }>(`/admin/logs/old?days=${days}`, {
+    method: "DELETE",
+  });
+}

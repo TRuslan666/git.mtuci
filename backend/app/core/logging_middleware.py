@@ -1,0 +1,83 @@
+"""
+Middleware for automatic HTTP request logging.
+Logs all requests, especially 4xx/5xx errors, with timing information.
+"""
+
+import time
+import asyncio
+from typing import Callable
+
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.models.system_log import LogLevel, LogSource
+from app.services.logging_service import log_event_background
+
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to log all HTTP requests.
+    Logs 4xx/5xx errors automatically with timing information.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        start_time = time.time()
+        
+        # Get client IP
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
+            ip_address = request.client.host if request.client else "unknown"
+        
+        # Get user info if available (from token in header)
+        user_id = None
+        user_email = None
+        user_full_name = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            # Could decode token to get user info, but for now skip to avoid overhead
+            pass
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Calculate duration
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Determine log level based on status code
+        status_code = response.status_code
+        if status_code >= 500:
+            level = LogLevel.ERROR
+        elif status_code >= 400:
+            level = LogLevel.WARNING
+        elif status_code >= 200:
+            level = LogLevel.INFO
+        else:
+            level = LogLevel.DEBUG
+        
+        # Skip logging for health checks and static files
+        path = request.url.path
+        if path in ["/docs", "/openapi.json", "/health", "/metrics"] or path.startswith("/static"):
+            return response
+        
+        # Skip logging successful GET requests to reduce noise
+        if status_code == 200 and request.method == "GET":
+            return response
+        
+        # Build message
+        message = f"{request.method} {path} - {status_code} ({duration_ms:.0f}ms)"
+        
+        # Log in background
+        asyncio.create_task(log_event_background(
+            level=level,
+            source=LogSource.admin,  # Use admin as source for HTTP requests
+            message=message,
+            ip_address=ip_address,
+            user_id=user_id,
+            user_email=user_email,
+            user_full_name=user_full_name,
+            http_status=status_code,
+        ))
+        
+        return response

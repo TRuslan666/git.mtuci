@@ -15,6 +15,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { getMe } from "../api/authApi";
+import { getUserStats } from "../api/adminApi";
+import { usePendingCount } from "../context/PendingCountContext";
 import type { UserRole } from "../api/types";
 
 interface MenuItem {
@@ -32,17 +34,21 @@ interface MenuSection {
   items: MenuItem[];
 }
 
+interface SidebarProps {
+  isDarkTheme?: boolean;
+}
+
 const adminMenuSections: MenuSection[] = [
   {
     title: "ОБЗОР",
     items: [
-      { path: "/admin", label: "Дашборд", icon: LayoutGrid },
+      { path: "/dashboard", label: "Дашборд", icon: LayoutGrid },
     ],
   },
   {
     title: "ПОЛЬЗОВАТЕЛИ",
     items: [
-      { path: "/users", label: "Все пользователи", icon: Users, badge: { text: "12", variant: "red" } },
+      { path: "/users", label: "Все пользователи", icon: Users },
       { path: "/roles", label: "Роли и доступ", icon: Briefcase },
     ],
   },
@@ -88,10 +94,11 @@ const studentMenuSections: MenuSection[] = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isDarkTheme = true }: SidebarProps) {
   console.log("[Sidebar] Component rendering");
   const location = useLocation();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const { pendingCount, setPendingCount } = usePendingCount();
 
   useEffect(() => {
     console.log("[Sidebar] useEffect triggered");
@@ -115,6 +122,26 @@ export default function Sidebar() {
     };
   }, []);
 
+  // Load pending users count for admin
+  useEffect(() => {
+    if (userRole !== "admin") return;
+    let cancelled = false;
+    async function loadPendingCount() {
+      try {
+        const stats = await getUserStats();
+        if (!cancelled) {
+          setPendingCount(stats.pending);
+        }
+      } catch (e) {
+        console.error("[Sidebar] Failed to load pending count:", e);
+      }
+    }
+    loadPendingCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [userRole, setPendingCount]);
+
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
 
@@ -122,8 +149,8 @@ export default function Sidebar() {
   if (userRole === null) {
     console.log("[Sidebar] Role is null, showing loading state");
     return (
-      <aside className="w-[260px] flex-shrink-0 min-h-screen border-r border-gray-200 bg-[#f9fafb] dark:bg-[#1c1c1e] dark:border-[#2d2d2d]">
-        <div className="p-4 text-sm text-gray-500">Loading...</div>
+      <aside className={`w-[260px] flex-shrink-0 h-full border-r ${isDarkTheme ? "border-[#2d2d2d] bg-[#111111]" : "border-gray-200 bg-white"}`}>
+        <div className={`p-4 text-sm ${isDarkTheme ? "text-[#8b949e]" : "text-gray-500"}`}>Loading...</div>
       </aside>
     );
   }
@@ -131,12 +158,24 @@ export default function Sidebar() {
   const menuSections = userRole === "admin" ? adminMenuSections : studentMenuSections;
   console.log("[Sidebar] Rendering menu for role:", userRole, "sections count:", menuSections.length);
 
+  // Theme-based colors
+  const sidebarBg = isDarkTheme ? "bg-[#111111]" : "bg-white";
+  const sidebarBorder = isDarkTheme ? "border-[#2d2d2d]" : "border-gray-200";
+  const sectionTitleColor = isDarkTheme ? "text-[#484f58]" : "text-gray-400";
+  const itemTextColor = isDarkTheme ? "text-[#8b949e]" : "text-gray-600";
+  const itemHoverBg = isDarkTheme ? "hover:bg-[#1a1a1a]" : "hover:bg-gray-100";
+  const itemHoverText = isDarkTheme ? "hover:text-[#ccd0d4]" : "hover:text-gray-900";
+  const itemIconColor = isDarkTheme ? "text-[#6e7681]" : "text-gray-500";
+  const activeBg = isDarkTheme ? "bg-[#1f2937]" : "bg-blue-50";
+  const activeText = isDarkTheme ? "text-white" : "text-blue-700";
+  const activeIconColor = isDarkTheme ? "text-white" : "text-blue-600";
+
   return (
-    <aside className="w-[260px] flex-shrink-0 min-h-screen border-r border-gray-200 bg-[#f9fafb] transition-colors dark:bg-[#1c1c1e] dark:border-[#2d2d2d]">
+    <aside className={`w-[260px] flex-shrink-0 h-full border-r ${sidebarBorder} ${sidebarBg}`}>
       <nav className="p-4">
         {menuSections.map((section) => (
           <div key={section.title} className="mb-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 px-3 text-[#9ca3af] transition-colors dark:text-gray-500">
+            <h3 className={`text-xs font-semibold uppercase tracking-wider mb-2 px-3 ${sectionTitleColor}`}>
               {section.title}
             </h3>
             <ul className="space-y-1">
@@ -149,31 +188,39 @@ export default function Sidebar() {
                       to={item.path}
                       className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                         active
-                          ? "bg-[#eff6ff] text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-                          : "text-[#374151] hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#2d2d2d] dark:hover:text-white"
+                          ? `${activeBg} ${activeText} border-l-2 border-blue-500`
+                          : `${itemTextColor} ${itemHoverBg} ${itemHoverText}`
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <Icon className={`h-5 w-5 ${
                           active 
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-gray-500 dark:text-gray-400"
+                            ? activeIconColor
+                            : itemIconColor
                         }`} />
                         <span>{item.label}</span>
                       </div>
+                      {/* Pending users badge for "Все пользователи" */}
+                      {item.path === "/users" && pendingCount > 0 && (
+                        <span
+                          className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-xs font-semibold bg-red-500 text-white"
+                        >
+                          {pendingCount}
+                        </span>
+                      )}
                       {item.badge && (
                         <span
                           className={`flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-xs font-semibold ${
                             item.badge.variant === "red"
-                              ? "bg-red-500 text-white dark:bg-red-500/80"
-                              : "bg-orange-500 text-white dark:bg-orange-500/80"
+                              ? "bg-red-500 text-white"
+                              : "bg-orange-500 text-white"
                           }`}
                         >
                           {item.badge.text}
                         </span>
                       )}
                       {item.label === "Мониторинг" && !item.badge && (
-                        <AlertCircle className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
                       )}
                     </Link>
                   </li>

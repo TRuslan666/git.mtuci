@@ -18,6 +18,23 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ""),
         },
+        "/stats": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
+        "/activity": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
+        "/webhooks": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
+        "/ws": {
+          target: proxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
   };

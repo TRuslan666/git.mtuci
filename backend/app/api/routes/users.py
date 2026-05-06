@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import os
 from pathlib import Path
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.security import get_current_user, hash_password, verify_password
+from app.core.permissions import require_permission
 from app.models.user import UserRole
 from app.schemas.user import ChangePasswordRequest, StudentUserRead, UpdateAvatarDisplayModeRequest, UserRead
 from app.services.user_service import get_user_by_id, get_users_by_role
@@ -98,6 +98,7 @@ async def change_my_password(
 
 
 @router.get("/students", response_model=list[StudentUserRead])
+@require_permission("user_view")
 async def get_students_endpoint(
     current_user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -113,6 +114,7 @@ async def get_students_endpoint(
 
 
 @router.get("/{user_id}", response_model=UserRead)
+@require_permission("user_view")
 async def get_user_by_id_endpoint(
     user_id: UUID,
     current_user=Depends(get_current_user),

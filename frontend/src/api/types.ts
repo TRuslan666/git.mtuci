@@ -1,4 +1,4 @@
-export type UserRole = "student" | "teacher" | "admin";
+export type UserRole = "student" | "teacher" | "admin" | "laborant";
 
 export type TokenType = "bearer";
 
@@ -12,9 +12,12 @@ export interface UserRead {
   email: string;
   full_name: string;
   role: UserRole;
+  is_blocked: boolean;
   avatar_url: string | null;
   avatar_display_mode: "cover" | "contain" | "fill" | "scale-down";
+  allow_assistant_grading: boolean;
   created_at: string;
+  last_login: string | null;
 }
 
 export interface AdminUserRead {
@@ -26,7 +29,9 @@ export interface AdminUserRead {
   student_id: string | null;
   is_blocked: boolean;
   is_pending?: boolean;
+  avatar_url: string | null;
   created_at: string;
+  last_login: string | null;
 }
 
 export interface SystemMetrics {
@@ -65,6 +70,53 @@ export interface ActiveRepositoryStat {
   is_public: boolean;
   initials: string;
   color: string;
+}
+
+export interface TodayStats {
+  total_events: number;
+  total_events_delta: number;
+  commits: number;
+  commits_delta: number;
+  active_users: number;
+  active_users_delta: number;
+  new_repositories: number;
+  new_repositories_delta: number;
+}
+
+export interface HotRepoStat {
+  name: string;
+  url: string;
+  events: number;
+  language: string | null;
+}
+
+export interface TopUserStat {
+  user_id: string;
+  user_name: string;
+  name: string;
+  initials: string;
+  color: string;
+  count: number;
+  percent: number;
+}
+
+export interface HourlyActivity {
+  hour: number;
+  count: number;
+  is_current: boolean;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  user: string;
+  initials: string;
+  color: string;
+  repo: string;
+  message: string;
+  time: string;
+  tag: string;
+  timestamp: string;
 }
 
 export interface Course {
@@ -185,3 +237,46 @@ export interface ResetPasswordRequest {
   new_password: string;
 }
 
+// Logs types
+export type LogLevel = "ERROR" | "WARNING" | "INFO" | "DEBUG";
+export type LogSource = "auth" | "repositories" | "webhooks" | "admin" | "gitea" | "permissions" | "courses";
+
+export interface LogEntry {
+  id: string;
+  created_at: string;
+  level: LogLevel;
+  source: LogSource;
+  user_id: string | null;
+  user_email: string | null;
+  user_full_name: string | null;
+  message: string;
+  detail: string | null;
+  ip_address: string;
+  http_status: number | null;
+}
+
+export interface LogsResponse {
+  logs: LogEntry[];
+  total: number;
+}
+
+export interface LogsStats {
+  total: number;
+  errors_today: number;
+  warnings_today: number;
+  success_today: number;
+}
+
+export interface LogsFilters {
+  level?: LogLevel;
+  source?: LogSource;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  sort?: "desc" | "asc";
+}
+
+export interface LogsPagination {
+  limit: number;
+  offset: number;
+}
